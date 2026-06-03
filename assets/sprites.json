@@ -1,0 +1,144 @@
+{
+  "description": "Science Tower Defense - 2D Cartoon Fantasy Sprite Manifest. Place your own custom transparent PNG assets in the paths below with the specified dimensions to replace procedural vector fallbacks.",
+  "sprites": {
+    "backgrounds": {
+      "bg_menu": {
+        "path": "assets/ui/fantasy_bg.png",
+        "recommended_dimensions": "1200x700"
+      }
+    },
+    "heroes": {
+      "einstein": {
+        "path": "assets/heroes/einstein.png",
+        "recommended_dimensions": "64x64",
+        "role": "Albert Einstein, lightning/fission hero"
+      },
+      "newton": {
+        "path": "assets/heroes/newton.png",
+        "recommended_dimensions": "64x64",
+        "role": "Isaac Newton, gravity stun hero"
+      },
+      "curie": {
+        "path": "assets/heroes/curie.png",
+        "recommended_dimensions": "64x64",
+        "role": "Marie Curie, radioactive damage hero"
+      },
+      "darwin": {
+        "path": "assets/heroes/darwin.png",
+        "recommended_dimensions": "64x64",
+        "role": "Charles Darwin, evolutionary block hero"
+      },
+      "tortoise": {
+        "path": "assets/heroes/tortoise.png",
+        "recommended_dimensions": "64x64",
+        "role": "Summoned Giant Galapagos Tortoise path blocker"
+      }
+    },
+    "towers": {
+      "physics_1": {
+        "path": "assets/towers/physics_1.png",
+        "recommended_dimensions": "64x64",
+        "description": "Physics Tesla watchtower (Level 1-2)"
+      },
+      "physics_3": {
+        "path": "assets/towers/physics_3.png",
+        "recommended_dimensions": "64x64",
+        "description": "Physics Tesla watchtower (Level 3)"
+      },
+      "physics_4": {
+        "path": "assets/towers/physics_4.png",
+        "recommended_dimensions": "64x64",
+        "description": "Physics Tesla watchtower (Level 4 Ultimate)"
+      },
+      "chemistry_1": {
+        "path": "assets/towers/chemistry_1.png",
+        "recommended_dimensions": "64x64",
+        "description": "Chemistry Acid beaker tower (Level 1-2)"
+      },
+      "chemistry_3": {
+        "path": "assets/towers/chemistry_3.png",
+        "recommended_dimensions": "64x64",
+        "description": "Chemistry Acid beaker tower (Level 3)"
+      },
+      "chemistry_4": {
+        "path": "assets/towers/chemistry_4.png",
+        "recommended_dimensions": "64x64",
+        "description": "Chemistry Acid beaker tower (Level 4 Ultimate)"
+      },
+      "biology_1": {
+        "path": "assets/towers/biology_1.png",
+        "recommended_dimensions": "64x64",
+        "description": "Biology Spore seed flower (Level 1-2)"
+      },
+      "biology_3": {
+        "path": "assets/towers/biology_3.png",
+        "recommended_dimensions": "64x64",
+        "description": "Biology Spore seed flower (Level 3)"
+      },
+      "biology_4": {
+        "path": "assets/towers/biology_4.png",
+        "recommended_dimensions": "64x64",
+        "description": "Biology Spore seed flower (Level 4 Ultimate)"
+      },
+      "astronomy_1": {
+        "path": "assets/towers/astronomy_1.png",
+        "recommended_dimensions": "64x64",
+        "description": "Astronomy black hole singularity (Level 1-2)"
+      },
+      "astronomy_3": {
+        "path": "assets/towers/astronomy_3.png",
+        "recommended_dimensions": "64x64",
+        "description": "Astronomy black hole singularity (Level 3)"
+      },
+      "astronomy_4": {
+        "path": "assets/towers/astronomy_4.png",
+        "recommended_dimensions": "64x64",
+        "description": "Astronomy black hole singularity (Level 4 Ultimate)"
+      }
+    },
+    "enemies": {
+      "flatearth": {
+        "path": "assets/enemies/flatearth.png",
+        "recommended_dimensions": "48x48",
+        "type": "Flat Earth disc creep"
+      },
+      "phlogiston": {
+        "path": "assets/enemies/phlogiston.png",
+        "recommended_dimensions": "36x36",
+        "type": "Phlogiston fast flame creep"
+      },
+      "spontaneous": {
+        "path": "assets/enemies/spontaneous.png",
+        "recommended_dimensions": "40x40",
+        "type": "Spontaneous Generation mold fly creep"
+      },
+      "maggot": {
+        "path": "assets/enemies/maggot.png",
+        "recommended_dimensions": "24x24",
+        "type": "Decaying Maggot spawn segment creep"
+      },
+      "alchemy": {
+        "path": "assets/enemies/alchemy.png",
+        "recommended_dimensions": "48x48",
+        "type": "Alchemy Gold crucible creep"
+      },
+      "perpetual": {
+        "path": "assets/enemies/perpetual.png",
+        "recommended_dimensions": "40x40",
+        "type": "Perpetual Motion wheel creep"
+      }
+    },
+    "projectiles": {
+      "flask": {
+        "path": "assets/projectiles/flask.png",
+        "recommended_dimensions": "24x24",
+        "type": "Boiling chemical splash flask projectile"
+      },
+      "spore": {
+        "path": "assets/projectiles/spore.png",
+        "recommended_dimensions": "16x16",
+        "type": "Glowing green spore needle projectile"
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+*.swp
+
+# Local Claude/dev tooling config (machine-specific paths)
+.claude/
+
+# Quarantined / rejected procedural background art (not used by the game)
+_rejected_level_art/
+
+# Node (defensive — project has no build step)
+node_modules/
+*.log

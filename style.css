@@ -1,0 +1,1000 @@
+/* style.css */
+/* Polished 2D Cartoon Fantasy Style inspired by Kingdom Rush & Realm Defense */
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;800&display=swap');
+
+:root {
+    --bg-dark: #0f0a1c;
+    --panel-bg: rgba(18, 11, 34, 0.93);
+    --panel-border: #f1c40f; /* Vibrant Kingdom Gold */
+    --parchment: #f9f2db;   /* Storybook Parchment */
+    
+    --neon-cyan: #00ffff;
+    --neon-purple: #bf55ec;
+    --neon-green: #2ecc71;
+    --neon-orange: #e67e22;
+    --neon-gold: #ffd700;
+    --neon-red: #e74c3c;
+    
+    --font-heading: 'Fredoka', -apple-system, sans-serif;
+    --font-body: 'Nunito', -apple-system, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    font-family: var(--font-body);
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: #ffffff;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    background: radial-gradient(circle at center, #1b1233 0%, #07030e 100%);
+}
+
+/* App Main storybook border container */
+#app-container {
+    width: 1200px;
+    height: 700px;
+    background: #000000;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    border: 6px solid #5a3c20; /* heavy rich wooden framework */
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85),
+                0 0 0 4px #b8860b, /* outer gold framing */
+                0 0 35px rgba(241, 196, 15, 0.15);
+    overflow: hidden;
+}
+
+/* Screen State Management */
+.screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform: scale(0.985);
+}
+
+.screen.active {
+    opacity: 1;
+    pointer-events: auto;
+    /* Overlay screens stay absolutely positioned so they layer at the top-left
+       of the app container. (#screen-playing keeps its own position:relative via
+       higher ID specificity, so gameplay layout is unaffected.) Using relative
+       here pushed any screen that appears after #screen-playing in the DOM
+       (victory, defeat, creator, meta) below the fold. */
+    position: absolute;
+    transform: scale(1);
+}
+
+/* CARTOON FANTASY BUTTONS */
+button {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 700;
+    background: linear-gradient(to bottom, #f39c12, #d35400); /* warm gold/orange */
+    border: 3.5px solid #2c1a0c;
+    color: #ffffff;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 10px 22px;
+    box-shadow: 0 4px 0 #853300, 0 6px 10px rgba(0,0,0,0.4);
+    text-shadow: 1.5px 1.5px 0 #2c1a0c;
+    text-transform: uppercase;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+button:hover:not(:disabled) {
+    background: linear-gradient(to bottom, #f1c40f, #e67e22);
+    transform: translateY(-1.5px);
+    box-shadow: 0 5.5px 0 #853300, 0 8px 12px rgba(0,0,0,0.5);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(3.5px);
+    box-shadow: 0 0.5px 0 #853300, 0 2px 4px rgba(0,0,0,0.3);
+}
+
+button:disabled {
+    background: linear-gradient(to bottom, #7f8c8d, #566573);
+    border-color: #2c1a0c;
+    color: #bdc3c7;
+    box-shadow: 0 4px 0 #2c3e50;
+    text-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ==========================================================================
+   1. MAIN MENU SCREEN (With Beautiful Cartoon Science Laboratory BG!)
+   ========================================================================== */
+#screen-menu {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background-image: linear-gradient(rgba(12, 8, 30, 0.4), rgba(12, 8, 30, 0.75)), url('assets/ui/fantasy_bg.png');
+    background-size: cover;
+    background-position: center;
+}
+
+.title-container {
+    margin-bottom: 45px;
+    background: var(--panel-bg);
+    border: 4px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 25px 45px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6), 0 0 15px rgba(241, 196, 15, 0.2);
+}
+
+.title-main {
+    font-family: var(--font-heading);
+    font-size: 54px;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 3px 3px 0 #2c1a0c, -3px -3px 0 #2c1a0c, 3px -3px 0 #2c1a0c, -3px 3px 0 #2c1a0c, 
+                 0 0 20px rgba(241, 196, 15, 0.5);
+    margin-bottom: 2px;
+}
+
+.title-sub {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--neon-cyan);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 340px;
+    background: rgba(18, 11, 34, 0.95);
+    padding: 30px;
+    border: 4px solid #8e6239; /* heavy wood frame */
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+}
+
+.menu-btn-cyan {
+    background: linear-gradient(to bottom, #1abc9c, #16a085);
+    border-color: #1b1424;
+    box-shadow: 0 4px 0 #0e6251, 0 6px 10px rgba(0,0,0,0.4);
+}
+
+.menu-btn-cyan:hover {
+    background: linear-gradient(to bottom, #2ecc71, #27ae60);
+    box-shadow: 0 5.5px 0 #186a3b, 0 8px 12px rgba(0,0,0,0.5);
+}
+
+/* ==========================================================================
+   2. LEVEL SELECT SCREEN (Saturated Cartoon Background)
+   ========================================================================== */
+#screen-levelselect {
+    background-image: linear-gradient(rgba(10, 5, 22, 0.85), rgba(10, 5, 22, 0.94)), url('assets/ui/fantasy_bg.png');
+    background-size: cover;
+    background-position: center;
+}
+
+.topic-selection-bar {
+    background: var(--panel-bg);
+    border: 3.5px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 15px 25px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+.topic-selection-bar h2 {
+    font-family: var(--font-heading);
+    font-size: 18px;
+    color: #ffffff;
+    text-shadow: 2px 2px 0 #2c1a0c;
+}
+
+.dropdown-wrapper {
+    display: flex;
+    gap: 15px;
+}
+
+select {
+    background: #000;
+    color: var(--neon-cyan);
+    border: 2.5px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 15px;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+}
+
+select:focus {
+    border-color: #ffffff;
+}
+
+.level-select-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: start;
+    padding: 4px 10px 4px 4px;
+}
+
+.level-card {
+    background: var(--panel-bg);
+    border: 3.5px solid #8e6239; /* wood frame card */
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.level-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--panel-border);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.6);
+}
+
+.level-card h3 {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: var(--panel-border);
+    text-shadow: 2px 2px 0 #2c1a0c;
+}
+
+.level-card p {
+    color: #bdc3c7;
+    font-size: 15px;
+    line-height: 1.4;
+    flex: 1;
+    margin-bottom: 20px;
+}
+
+.level-card .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 2px solid rgba(255,255,255,0.06);
+    padding-top: 12px;
+}
+
+.level-card .btn-start {
+    padding: 6px 14px;
+    font-size: 10px;
+    border-radius: 6px;
+}
+
+/* ==========================================================================
+   3. PLAYING SCREEN LAYOUT
+   ========================================================================== */
+#screen-playing {
+    padding: 0;
+    flex-direction: row;
+    position: relative;
+    background: #0b0713;
+}
+
+.game-viewport {
+    flex: 1;
+    min-width: 0; /* allow shrinking below header's min-content so it can't push the fixed sidebar off the right edge */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* Top HUD Dashboard */
+.hud-header {
+    height: 55px;
+    background: #0d091a;
+    border-bottom: 4px solid #8e6239; /* rich wood divider */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px; /* trimmed from 25px so the control buttons (incl. ABANDON) fit the 900px canvas width */
+    font-size: 15px;  /* trimmed from 17px to recover header width */
+    font-weight: 700;
+    gap: 8px;
+}
+
+.hud-stat-box {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* was 15px */
+}
+
+.hud-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 2px solid #5a3c20;
+    border-radius: 12px;
+    padding: 3px 9px; /* was 3px 12px */
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+    white-space: nowrap;
+}
+
+/* Sidebar Dashboard */
+.hud-sidebar {
+    width: 280px;
+    flex: 0 0 280px; /* never let the viewport's 900px canvas squeeze the sidebar (was collapsing to ~177px and clipping the right shop column + hero HP) */
+    background: #110b21;
+    border-left: 4px solid #8e6239;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    height: 100%;
+    box-shadow: inset 8px 0 15px rgba(0,0,0,0.4);
+}
+
+.hud-sidebar h2 {
+    font-family: var(--font-heading);
+    font-size: 12px;
+    color: var(--panel-border);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-shadow: 1.5px 1.5px 0 #000;
+}
+
+/* Shop grid style */
+.shop-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.shop-btn {
+    background: linear-gradient(to bottom, #231b35, #140d21);
+    border: 3.5px solid #8e6239; /* wooden tower buttons */
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #000;
+    transition: transform 0.1s ease;
+}
+
+.shop-btn:hover {
+    border-color: var(--panel-border);
+}
+
+.shop-btn.active {
+    border-color: #2ece71 !important;
+    background: rgba(46, 206, 113, 0.08) !important;
+    box-shadow: 0 0 10px rgba(46, 206, 113, 0.2);
+}
+
+.shop-btn .tower-icon {
+    font-size: 26px;
+    margin-bottom: 2px;
+}
+
+.shop-btn .tower-name {
+    font-family: var(--font-heading);
+    font-size: 10px;
+    color: #d5dbdb;
+}
+
+.shop-btn .tower-cost {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--neon-gold);
+    margin-top: 1px;
+}
+
+/* Hero card container */
+.hud-hero-skills-section {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.hero-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2.5px solid #5a3c20;
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.5);
+}
+
+.hero-card:hover {
+    border-color: var(--panel-border);
+}
+
+.hero-card.selected {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 255, 255, 0.03);
+}
+
+.hero-card .hero-name {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    color: #fff;
+    text-shadow: 1.5px 1.5px 0 #000;
+}
+
+.hero-card .hp-txt {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: #bdc3c7;
+}
+
+.hero-card .hp-bar {
+    height: 5px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    border: 1px solid #111;
+}
+
+.hero-card .hp-fill {
+    height: 100%;
+    background: var(--neon-green);
+}
+
+.hero-skill-btn {
+    width: 100%;
+    height: 26px;
+    font-size: 9px;
+    border-radius: 6px;
+    border: 2px solid var(--panel-border);
+    background: linear-gradient(to bottom, #8e44ad, #5b108f);
+    color: #fff;
+    box-shadow: 0 2px 0 #000;
+}
+
+.hero-skill-btn:hover:not(:disabled) {
+    background: linear-gradient(to bottom, #a569bd, #7d3c98);
+}
+
+/* Hero active-ability bar — bottom-centre overlay on the play area */
+#hero-ability-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 5;
+    pointer-events: none; /* let the gap pass clicks through to the canvas */
+}
+
+#hero-ability-bar .ability-btn {
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    width: 120px;
+    height: 56px;
+    border-radius: 12px;
+    border: 2.5px solid var(--panel-border);
+    background: linear-gradient(to bottom, #7d3c98, #4a148c);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #000, 0 8px 16px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+    text-shadow: 1px 1px 0 #000;
+}
+
+#hero-ability-bar .ability-btn .ability-name {
+    font-family: var(--font-heading);
+    font-size: 11px;
+    color: #ffe082;
+}
+
+#hero-ability-bar .ability-btn .ability-skill {
+    font-size: 9px;
+    opacity: 0.92;
+    padding: 0 4px;
+    text-align: center;
+}
+
+#hero-ability-bar .ability-btn .ability-status {
+    font-size: 9px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+#hero-ability-bar .ability-btn.ready {
+    border-color: #f1c40f;
+    box-shadow: 0 0 10px rgba(241,196,15,0.7), 0 4px 0 #000;
+}
+
+#hero-ability-bar .ability-btn.ready .ability-status { color: #7CFC00; }
+
+#hero-ability-bar .ability-btn.selected { border-color: var(--neon-cyan); }
+
+#hero-ability-bar .ability-btn:disabled { cursor: default; opacity: 0.9; }
+
+#hero-ability-bar .ability-btn.dead {
+    background: linear-gradient(to bottom, #555, #333);
+    border-color: #777;
+}
+
+/* Cooldown / revive sweep that drains from the top */
+#hero-ability-bar .ability-btn .ability-cd {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.55);
+    pointer-events: none;
+}
+
+/* In-game floating log banner */
+#hud-log {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(18, 11, 34, 0.95);
+    border: 3px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 8px 18px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    pointer-events: none;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Warm upgrade panel overlay */
+#tower-upgrade-menu {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: var(--panel-bg);
+    border: 4px solid #8e6239; /* heavy wood border */
+    border-radius: 16px;
+    padding: 15px 25px;
+    display: none;
+    flex-direction: column;
+    width: 480px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    z-index: 20; /* sit above the hero ability bar (z:5) so its buttons aren't covered */
+}
+
+#tower-upgrade-menu h3 {
+    font-family: var(--font-heading);
+    font-size: 15px;
+    margin-bottom: 4px;
+    color: var(--panel-border);
+    text-shadow: 1.5px 1.5px 0 #000;
+}
+
+#tower-upgrade-menu button {
+    flex: 1;
+    height: 34px;
+    font-size: 10px;
+    border-radius: 6px;
+}
+
+/* Sell button: muted by default, flips to a loud red "confirm" state on first
+   click so an accidental tap can't sell the tower. */
+#tower-upgrade-menu #sell-btn {
+    background: linear-gradient(to bottom, #7a4a2a, #5a3320);
+}
+#tower-upgrade-menu #sell-btn.sell-armed {
+    background: linear-gradient(to bottom, #e74c3c, #c0392b);
+    border-color: #ffd166;
+    animation: sellPulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes sellPulse {
+    from { box-shadow: 0 4px 0 #853300, 0 0 4px rgba(231,76,60,0.5); }
+    to   { box-shadow: 0 4px 0 #853300, 0 0 14px rgba(231,76,60,0.95); }
+}
+
+#tower-upgrade-menu .branch-btn {
+    height: 42px;
+    font-size: 10px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6c3fb5, #8e44ad);
+    color: #fff;
+    border: 2px solid #f1c40f;
+}
+
+#tower-upgrade-menu .branch-btn:disabled {
+    opacity: 0.45;
+    background: #4a4a55;
+    border-color: #6b6b78;
+}
+
+#tower-upgrade-menu .target-mode-btn {
+    width: 100%;
+    flex: none;
+    margin-top: 8px;
+    height: 30px;
+    font-size: 10px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #1f6f9e, #16a085);
+    color: #eafff7;
+    border: 1px solid rgba(255,255,255,0.18);
+}
+
+#tower-upgrade-menu .target-mode-btn:disabled {
+    opacity: 0.5;
+    background: #3a4150;
+}
+
+/* Lab Bench (meta upgrades) */
+.meta-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px solid rgba(142, 68, 173, 0.5);
+    border-radius: 12px;
+    padding: 12px 18px;
+}
+
+.meta-label {
+    font-family: var(--font-heading);
+    font-size: 15px;
+    color: #fff;
+}
+
+.meta-pips {
+    color: #ffd700;
+    letter-spacing: 3px;
+    margin-left: 8px;
+    font-size: 13px;
+}
+
+.meta-desc {
+    font-size: 12px;
+    color: #bdc3c7;
+    margin-top: 3px;
+}
+
+.meta-buy {
+    flex-shrink: 0;
+    height: 38px;
+    min-width: 96px;
+    border: 2px solid #f1c40f;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6c3fb5, #8e44ad);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.meta-buy:disabled {
+    opacity: 0.4;
+    background: #4a4a55;
+    border-color: #6b6b78;
+    cursor: default;
+}
+
+/* ==========================================================================
+   4. MODALS & POP-UPS (Beautiful Storybook Overlays)
+   ========================================================================== */
+.modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 5, 20, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+}
+
+.question-container {
+    width: 580px;
+    max-width: 92%;
+    max-height: 90%;
+    overflow-y: auto;
+    background-color: var(--parchment); /* Vintage Storybook paper */
+    border: 6px solid #5a3c20;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8),
+                0 0 0 3px #f1c40f;
+    text-align: center;
+    color: #2c1a0c; /* Dark warm brown text */
+}
+
+.q-header {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    color: #853300;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+}
+
+.q-body {
+    font-size: 23px;
+    font-weight: 700;
+    margin-bottom: 25px;
+    line-height: 1.35;
+    color: #2c1a0c;
+}
+
+.q-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.opt-btn {
+    width: 100%;
+    min-height: 44px;
+    height: auto;
+    display: flex;
+    align-items: center;
+    background: #fffdf5;
+    border: 2.5px solid #8e6239;
+    border-radius: 10px;
+    color: #2c1a0c;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.3;
+    text-align: left;
+    padding: 9px 18px;
+    white-space: normal;
+    word-break: break-word;
+    box-shadow: 0 3px 0 #5a3c20;
+    text-shadow: none;
+}
+
+.opt-btn:hover:not(:disabled) {
+    background: #f1c40f !important;
+    color: #000000 !important;
+    border-color: #2c1a0c !important;
+    transform: translateX(4px);
+    box-shadow: 0 3px 0 #2c1a0c !important;
+}
+
+/* ==========================================================================
+   5. END GAME SCREENS
+   ========================================================================== */
+.end-screen {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #0b0713;
+}
+
+.end-screen h1 {
+    font-family: var(--font-heading);
+    font-size: 52px;
+    margin-bottom: 12px;
+}
+
+.end-screen p {
+    color: #bdc3c7;
+    font-size: 20px;
+    max-width: 550px;
+    margin: 0 auto 30px auto;
+    line-height: 1.5;
+}
+
+.victory-title {
+    color: var(--panel-border);
+    text-shadow: 3px 3px 0 #2c1a0c, 0 0 15px rgba(241, 196, 15, 0.4);
+}
+
+.defeat-title {
+    color: var(--neon-red);
+    text-shadow: 3px 3px 0 #2c1a0c, 0 0 15px rgba(231, 76, 60, 0.4);
+}
+
+/* ==========================================================================
+   6. CUSTOM QUESTION CREATOR
+   ========================================================================== */
+#screen-creator {
+    background: #110b21;
+}
+
+#screen-creator h1 {
+    font-family: var(--font-heading);
+    font-size: 20px;
+    color: var(--panel-border);
+    text-shadow: 2px 2px 0 #000;
+}
+
+.creator-panel-text {
+    width: 100%;
+    height: 280px;
+    background: #000000;
+    border: 3px solid #8e6239;
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--neon-green);
+    font-family: monospace;
+    font-size: 15px;
+    outline: none;
+    resize: none;
+}
+
+.creator-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.creator-btn {
+    flex: 1;
+    height: 42px;
+}
+
+/* Custom premium scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #090612;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #8e6239;
+    border: 2px solid #090612;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--panel-border);
+}
+
+/* ============================================================
+   Tower upgrade stat-choice options (damage / range / speed)
+   ============================================================ */
+.upg-options {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+#tower-upgrade-menu .upg-opt-btn {
+    flex: 1;
+    height: auto;
+    min-height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #1d8a52, #27ae60);
+    color: #fff;
+    border: 2px solid #0c5c34;
+    border-radius: 8px;
+    cursor: pointer;
+}
+#tower-upgrade-menu .upg-opt-btn .upg-opt-cost {
+    font-size: 10px;
+    color: var(--neon-gold);
+}
+#tower-upgrade-menu .upg-opt-btn:disabled {
+    opacity: 0.45;
+    background: #3a3a44;
+    border-color: #555;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   Boss level cards
+   ============================================================ */
+.level-card.boss-level {
+    border-color: #ff3b5c;
+    box-shadow: 0 0 18px rgba(255, 59, 92, 0.35);
+}
+.level-card.locked-level {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-style: dashed;
+    border-color: #555;
+    filter: grayscale(0.5);
+}
+.level-card .boss-tag {
+    display: inline-block;
+    margin: 6px 0 0;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #c0392b, #e74c3c);
+    border-radius: 6px;
+}
+
+/* ============================================================
+   Bestiary (monster wiki)
+   ============================================================ */
+#screen-bestiary { overflow-y: auto; }
+.bestiary-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    align-content: start;
+}
+.bestiary-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px solid rgba(0, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.bestiary-card.locked {
+    opacity: 0.55;
+    border-color: rgba(255, 255, 255, 0.12);
+    border-style: dashed;
+}
+.bestiary-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+}
+.bestiary-name {
+    font-family: var(--font-heading);
+    font-size: 15px;
+    color: var(--neon-cyan);
+}
+.bestiary-threat { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.bestiary-role {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #9aa4b2;
+    margin-bottom: 6px;
+}
+.bestiary-desc { font-size: 13px; color: #d6dae2; margin-bottom: 8px; line-height: 1.4; }
+.bestiary-counter { font-size: 12px; color: #7fdb6a; line-height: 1.4; }

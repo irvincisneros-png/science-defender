@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Science Tower Defense - Revision & Learning Tool</title>
+    <meta name="description" content="A Science-themed Tower Defense game featuring famous scientists, modular discipline towers, and custom revision questions. Defeat misconceptions using empirical science!">
+    <!-- Google Fonts DNS prefetch and linkage -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="app-container">
+        
+        <!-- ==========================================
+             1. MAIN MENU SCREEN
+             ========================================== -->
+        <div id="screen-menu" class="screen active">
+            <div class="title-container">
+                <h1 class="title-main">Science Defender</h1>
+                <p class="title-sub">The Empirical Defense Initiative</p>
+            </div>
+            
+            <div class="menu-buttons">
+                <button class="menu-btn menu-btn-cyan" onclick="switchScreen('screen-levelselect')">Launch Experiment (Play)</button>
+                <button class="menu-btn" onclick="switchScreen('screen-bestiary')">📖 Bestiary (Monster Wiki)</button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             2. LEVEL SELECT SCREEN
+             ========================================== -->
+        <div id="screen-levelselect" class="screen">
+            <div class="topic-selection-bar">
+                <h2>Configure Curriculum</h2>
+                <div class="dropdown-wrapper">
+                    <div>
+                        <label for="select-year" style="font-size: 11px; text-transform: uppercase; color: #bdc3c7; display: block; margin-bottom: 4px;">Year Group</label>
+                        <select id="select-year" onchange="onYearChange()">
+                            <option value="7">Year 7</option>
+                            <option value="8" selected>Year 8</option>
+                            <option value="9">Year 9</option>
+                            <option value="10">Year 10</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="select-topic" style="font-size: 11px; text-transform: uppercase; color: #bdc3c7; display: block; margin-bottom: 4px;">Topic / Exam</label>
+                        <select id="select-topic" onchange="updateQuestionPool()">
+                            <!-- populated dynamically from window.TOPIC_META -->
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items:flex-end;">
+                        <span id="pool-count" style="font-size: 11px; color: #00ff66;"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="level-select-container" id="level-select-container">
+                <!-- Level cards rendered dynamically from LEVEL_DATA by renderLevelCards() -->
+            </div>
+
+            <div style="margin-top: auto; display: flex; justify-content: space-between; gap: 12px;">
+                <button style="padding: 10px 25px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Back to Menu</button>
+                <button style="padding: 10px 25px; background: linear-gradient(135deg, #8e44ad, #6c3fb5); color:#fff;" onclick="switchScreen('screen-meta')">🔬 Lab Bench (Upgrades)</button>
+                <button style="padding: 10px 25px; background: linear-gradient(135deg, #f39c12, #e67e22); color:#000;" onclick="launchLevel(0, true)">Launch Endless Mode</button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             3. ACTIVE GAME PLAY VIEWPORT
+             ========================================== -->
+        <div id="screen-playing" class="screen">
+            <!-- Left Side Game Canvas Space -->
+            <div class="game-viewport">
+                <div class="hud-header">
+                    <div id="level-name-txt" style="color: var(--neon-cyan); text-transform: uppercase; font-weight: 800;">Laboratory Defense</div>
+                    
+                    <div class="hud-stat-box">
+                        <div class="hud-stat">
+                            <span class="icon" style="color: var(--neon-gold);">💰</span>
+                            <span id="ui-gold">350</span> Gold
+                        </div>
+                        <div class="hud-stat">
+                            <span class="icon" style="color: red;">❤️</span>
+                            <span id="ui-lives">20</span> Lives
+                        </div>
+                        <div class="hud-stat">
+                            <span class="icon" style="color: var(--neon-cyan);">🔬</span>
+                            <span id="ui-rp">0</span> RP (Research)
+                        </div>
+                        <div class="hud-stat">
+                            <span class="icon" style="color: var(--neon-purple);">🌊</span>
+                            Wave <span id="ui-wave">1/5</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap: 8px;">
+                        <button id="speed-btn" style="height: 30px; font-size:11px; padding: 0 12px; background:rgba(243,156,18,0.25); min-width:54px;" onclick="toggleGameSpeed()">▶ 1×</button>
+                        <button id="mute-btn" style="height: 30px; font-size:13px; padding: 0 10px; background:rgba(255,255,255,0.08);" onclick="toggleAudioMute()" title="Mute / unmute music">🔊</button>
+                        <button style="height: 30px; font-size:11px; padding: 0 12px; background:rgba(255,255,255,0.08);" onclick="togglePauseGame()">Pause</button>
+                        <button style="height: 30px; font-size:11px; padding: 0 12px; background:#ff3333;" onclick="abandonCurrentLevel()">Abandon</button>
+                    </div>
+                </div>
+
+                <div style="position:relative; flex: 1; display:flex; align-items:center; justify-content:center;">
+                    <canvas id="game-canvas"></canvas>
+                    
+                    <!-- Notification logger overlay -->
+                    <div id="hud-log">Objective: Place towers and defend the portal!</div>
+                    
+                    <!-- Dynamic Upgrade Drawer -->
+                    <div id="tower-upgrade-menu">
+                        <!-- Filled in js/game.js -->
+                    </div>
+
+                    <!-- Hero active-ability bar (bottom-centre overlay) -->
+                    <div id="hero-ability-bar">
+                        <!-- Filled in js/game.js renderHeroAbilityBar() -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side Interactive Sidebar Dashboard -->
+            <div class="hud-sidebar">
+                <h2>Discipline Shop</h2>
+                <div class="shop-grid">
+                    <div class="shop-btn" data-tower="physics" onclick="selectTowerForPlacement('physics', this)">
+                        <span class="tower-icon" style="color: var(--neon-cyan);">⚡</span>
+                        <span class="tower-name">Physics</span>
+                        <span class="tower-cost">100G</span>
+                    </div>
+                    <div class="shop-btn" data-tower="biology" onclick="selectTowerForPlacement('biology', this)">
+                        <span class="tower-icon" style="color: var(--neon-green);">🌿</span>
+                        <span class="tower-name">Biology</span>
+                        <span class="tower-cost">80G</span>
+                    </div>
+                    <div class="shop-btn" data-tower="chemistry" onclick="selectTowerForPlacement('chemistry', this)">
+                        <span class="tower-icon" style="color: var(--neon-orange);">🧪</span>
+                        <span class="tower-name">Chemistry</span>
+                        <span class="tower-cost">120G</span>
+                    </div>
+                    <div class="shop-btn" data-tower="astronomy" onclick="selectTowerForPlacement('astronomy', this)">
+                        <span class="tower-icon" style="color: var(--neon-purple);">🪐</span>
+                        <span class="tower-name">Astronomy</span>
+                        <span class="tower-cost">160G</span>
+                    </div>
+                    <div class="shop-btn" data-tower="volcano" onclick="selectTowerForPlacement('volcano', this)">
+                        <span class="tower-icon" style="color: #ff3b1d;">🌋</span>
+                        <span class="tower-name">Volcano</span>
+                        <span class="tower-cost">140G</span>
+                    </div>
+                    <div class="shop-btn" data-tower="barracks" onclick="selectTowerForPlacement('barracks', this)">
+                        <span class="tower-icon" style="color: #c0a062;">🛡️</span>
+                        <span class="tower-name">Barracks</span>
+                        <span class="tower-cost">110G</span>
+                    </div>
+                </div>
+
+                <h2>Science Heroes</h2>
+                <div id="hud-hero-skills" class="hud-hero-skills-section">
+                    <!-- Filled dynamically in gameInstance.updateSidebarUI() -->
+                </div>
+
+                <div class="hud-controls">
+                    <button class="hud-btn-big" id="start-wave-btn" onclick="startActiveWave()">Start Wave</button>
+                    <button class="hud-btn-big" id="solve-rush-btn" style="display:none; background: linear-gradient(135deg, #8e44ad, #c0392b); min-height:40px; height:auto; font-size:13px; white-space:normal; line-height:1.2; padding:6px 8px;" onclick="solveRush()">⚡ Solve to Rush<br><span style="font-size:10px; opacity:0.85;">Correct = call wave + 2× gold + heal</span></button>
+                    <button class="hud-btn-big" style="background: linear-gradient(135deg, #16a085, #27ae60); min-height:40px; height:auto; font-size:13px; white-space:normal; line-height:1.2; padding:6px 8px;" onclick="openLabModal()">💡 Research Lab<br><span style="font-size:10px; opacity:0.85;">Answer to earn RP</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             4. VICTORY SCREEN
+             ========================================== -->
+        <div id="screen-victory" class="screen end-screen">
+            <h1 class="victory-title">Scientific Victory!</h1>
+            <div id="victory-details">
+                <!-- details go here -->
+            </div>
+            <div style="margin-top: 30px; display:flex; gap:15px; justify-content:center;">
+                <button style="padding: 12px 30px;" onclick="switchScreen('screen-levelselect')">Continue</button>
+                <button style="padding: 12px 30px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             5. DEFEAT SCREEN
+             ========================================== -->
+        <div id="screen-defeat" class="screen end-screen">
+            <h1 class="defeat-title">Scientific Fallacy!</h1>
+            <div id="defeat-details">
+                <!-- details go here -->
+            </div>
+            <div style="margin-top: 30px; display:flex; gap:15px; justify-content:center;">
+                <button style="padding: 12px 30px;" onclick="switchScreen('screen-levelselect')">Try Again</button>
+                <button style="padding: 12px 30px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             6. BESTIARY — MONSTER & BOSS WIKI (encounter-gated)
+             ========================================== -->
+        <div id="screen-bestiary" class="screen">
+            <h1 style="font-size:24px; color: var(--neon-cyan); margin-bottom:6px;">📖 Bestiary — Field Notes</h1>
+            <p style="color: #bdc3c7; font-size: 14px; margin-bottom: 16px;">Entries unlock the first time you encounter each misconception in battle. Defeat them to complete your research log.</p>
+            <div id="bestiary-list" class="bestiary-list"></div>
+            <div style="margin-top:auto; padding-top:16px;">
+                <button style="padding: 10px 25px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- ==========================================
+             7. LAB BENCH — PERMANENT (META) UPGRADES
+             ========================================== -->
+        <div id="screen-meta" class="screen">
+            <h1 style="font-size:24px; color: var(--neon-purple); margin-bottom:6px;">🔬 Lab Bench — Permanent Research</h1>
+            <p style="color:#bdc3c7; font-size:14px; margin-bottom:16px;">
+                Spend <strong>Stars</strong> (earned by completing levels) on permanent upgrades that apply to every run.
+                Reset any time to reallocate.
+            </p>
+
+            <div style="display:flex; gap:24px; margin-bottom:16px; font-size:15px;">
+                <div>Stars available: <strong style="color:#ffd700; font-size:20px;"><span id="meta-stars-avail">0</span>★</strong></div>
+                <div style="color:#8c8c9a;">Total earned: <span id="meta-stars-total">0</span>★</div>
+            </div>
+
+            <div id="meta-list" class="meta-list"></div>
+
+            <div style="margin-top:auto; display:flex; justify-content:space-between; gap:12px; padding-top:16px;">
+                <button style="padding:10px 25px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-levelselect')">Back to Level Select</button>
+                <button style="padding:10px 25px; background:#ff3333;" onclick="resetMeta()">Reset All Upgrades</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Active Popup Overlay for Questions -->
+    <div id="question-modal" class="modal" style="display:none;">
+        <!-- Dynamic populated Question Form -->
+    </div>
+
+    <!-- Active Pause Modal -->
+    <div id="pause-modal" class="modal" style="display:none;">
+        <div class="question-container" style="width: 320px;">
+            <h2 style="color:var(--neon-cyan); margin-bottom:15px;">EXPERIMENT PAUSED</h2>
+            <button style="width: 100%; height:40px; margin-bottom:10px;" onclick="togglePauseGame()">Resume Experiment</button>
+            <button style="width: 100%; height:40px; background:#ff3333;" onclick="abandonCurrentLevel()">Abandon Level</button>
+        </div>
+    </div>
+
+    <!-- Script loading cascade (strictly ordered) -->
+    <!-- Question banks populate window.QUESTION_BANK before QuestionManager reads it -->
+    <script src="js/questions-y7.js"></script>
+    <script src="js/questions-y8.js"></script>
+    <script src="js/questions-y9.js"></script>
+    <script src="js/questions-y10.js"></script>
+    <script src="js/questions.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/levels.js"></script>
+    <script src="js/enemies.js"></script>
+    <script src="js/towers.js"></script>
+    <script src="js/heroes.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/game.js"></script>
+
+    <script>
+        // App coordinates and transitions
+        function switchScreen(screenId) {
+            document.querySelectorAll(".screen").forEach(s => {
+                s.classList.remove("active");
+                s.style.display = ""; // clear any stale inline display so .active CSS wins
+            });
+            document.getElementById(screenId).classList.add("active");
+
+            // Menu-type screens play the calm menu theme. The playing screen's
+            // music is driven by the game loop (battle / boss); victory & defeat
+            // screens are left to their stinger (set in trigger*()).
+            const MENU_SCREENS = ["screen-menu", "screen-levelselect", "screen-meta", "screen-bestiary"];
+            if (window.audioManager && MENU_SCREENS.includes(screenId)) {
+                window.audioManager.playMusic("menu");
+            }
+
+            if (screenId === "screen-meta" && window.gameInstance) {
+                window.gameInstance.renderMetaScreen();
+            }
+            if (screenId === "screen-levelselect" && window.gameInstance) {
+                window.gameInstance.renderLevelStars();
+                populateTopicDropdown();
+            }
+            if (screenId === "screen-bestiary" && window.gameInstance && window.gameInstance.renderBestiary) {
+                window.gameInstance.renderBestiary();
+            }
+        }
+
+        // Build the Topic / Exam dropdown for the currently-selected year group.
+        function populateTopicDropdown() {
+            const year = parseInt(document.getElementById("select-year").value, 10);
+            const topicSel = document.getElementById("select-topic");
+            const meta = (window.TOPIC_META && window.TOPIC_META[year]) || [];
+            topicSel.innerHTML = "";
+            meta.forEach((t, i) => {
+                const opt = document.createElement("option");
+                opt.value = t.key;
+                opt.textContent = `Topic ${i + 1}: ${t.name}`;
+                topicSel.appendChild(opt);
+            });
+            const half = document.createElement("option");
+            half.value = "halfyearly";
+            half.textContent = "📝 Half-Yearly Exam (Topics 1–2)";
+            topicSel.appendChild(half);
+            const yearly = document.createElement("option");
+            yearly.value = "yearly";
+            yearly.textContent = "📚 Yearly Exam (All Topics)";
+            yearly.selected = true;
+            topicSel.appendChild(yearly);
+            updateQuestionPool();
+        }
+
+        function onYearChange() {
+            populateTopicDropdown();
+        }
+
+        // Initialize game manager
+        const game = new Game();
+        window.gameInstance = game;
+
+        function launchLevel(levelIndex, endless) {
+            switchScreen("screen-playing");
+            game.startLevel(levelIndex, endless);
+        }
+
+        function abandonCurrentLevel() {
+            document.getElementById("pause-modal").style.display = "none";
+            game.gameState = "menu";
+            switchScreen("screen-levelselect");
+        }
+
+        function togglePauseGame() {
+            if (game.gameState !== "playing") return;
+            game.isPaused = !game.isPaused;
+            document.getElementById("pause-modal").style.display = game.isPaused ? "flex" : "none";
+        }
+
+        function startActiveWave() {
+            game.callOrStartWave();
+        }
+
+        function toggleGameSpeed() {
+            game.toggleGameSpeed();
+        }
+
+        function toggleAudioMute() {
+            if (!window.audioManager) return;
+            const muted = window.audioManager.toggleMute();
+            const btn = document.getElementById("mute-btn");
+            if (btn) btn.textContent = muted ? "🔇" : "🔊";
+        }
+
+        // Active shop selection
+        function selectTowerForPlacement(type, btnElement) {
+            // Uncheck other buttons
+            document.querySelectorAll(".shop-btn").forEach(b => b.classList.remove("active"));
+            
+            if (game.selectedTowerType === type) {
+                game.selectedTowerType = null; // deselect
+            } else {
+                game.selectedTowerType = type;
+                btnElement.classList.add("active");
+                game.showInGameNotification(`Targeting: Click ground to place ${type} tower.`);
+            }
+        }
+
+        // Configure the active revision question pool from the Year + Topic dropdowns.
+        function updateQuestionPool() {
+            const year = document.getElementById("select-year").value;
+            const topic = document.getElementById("select-topic").value;
+            game.questionManager.setSelection(year, topic);
+            const countEl = document.getElementById("pool-count");
+            if (countEl) countEl.textContent = `${game.questionManager.poolSize()} questions loaded`;
+        }
+
+        // Open Active Research Lab (active learning farming)
+        function openLabModal() {
+            game.triggerQuestionPopup();
+        }
+
+        // Build the topic dropdown once on load.
+        populateTopicDropdown();
+
+        // Queue the menu theme (plays on first user gesture per autoplay rules)
+        // and sync the mute button to the saved preference.
+        if (window.audioManager) {
+            window.audioManager.playMusic("menu");
+            const mBtn = document.getElementById("mute-btn");
+            if (mBtn) mBtn.textContent = window.audioManager.muted ? "🔇" : "🔊";
+        }
+    </script>
+</body>
+</html>
