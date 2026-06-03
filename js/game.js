@@ -182,6 +182,20 @@ class Game {
         this.isEndless = false;
         this.PATH_CLEARANCE = 34; // min px from path centerline for a build pad
 
+        // --- Late-game difficulty ramp (engagement) -----------------------
+        // Levels 1–3 are the onboarding curve and stay untouched. From Level 4
+        // (id >= 3) the player unlocks extra tower types, full level-3 upgrades
+        // AND specialisations, so the base +0.28/level enemy scaling fell behind
+        // and later levels felt too easy. These add a CAPPED ramp on top — both
+        // tankier enemies and bigger waves — so players must use their full
+        // toolkit (all disciplines, specialisations, heroes, battle items).
+        // Tunable: raise to make late levels harder, lower to ease them.
+        this.LATE_RAMP_START_ID = 3;       // first level the ramp applies to (Level 4)
+        this.LATE_HP_PER_LEVEL = 0.16;     // extra HP-scale per level past L3 (bosses get half)
+        this.LATE_HP_CAP = 2.0;            // max extra HP-scale (≈ +74% HP at the cap)
+        this.LATE_COUNT_PER_LEVEL = 0.07;  // extra enemies per level past L3
+        this.LATE_COUNT_CAP = 0.6;         // max +60% enemy count
+
         // Game state variables
         this.gold = 350;
         this.lives = 20;
@@ -832,10 +846,19 @@ class Game {
             }
         }
 
+        // Late-game wave-size ramp: more enemies per level past L3 (capped),
+        // so later levels apply real pressure. Boss spawners are never
+        // multiplied (so we never accidentally spawn extra bosses).
+        const countMult = (!this.isEndless && this.level && this.level.id >= this.LATE_RAMP_START_ID)
+            ? 1 + Math.min(this.LATE_COUNT_CAP, (this.level.id - (this.LATE_RAMP_START_ID - 1)) * this.LATE_COUNT_PER_LEVEL)
+            : 1;
+
         // Fill spawnQueue (append when rushing so the current wave finishes spawning first)
         if (!append) this.spawnQueue = [];
         waveConfig.forEach(spawner => {
-            for (let i = 0; i < spawner.count; i++) {
+            const isBoss = typeof spawner.type === "string" && spawner.type.indexOf("boss_") === 0;
+            const count = isBoss ? spawner.count : Math.round(spawner.count * countMult);
+            for (let i = 0; i < count; i++) {
                 this.spawnQueue.push({
                     type: spawner.type,
                     delay: spawner.delay
@@ -854,9 +877,17 @@ class Game {
         let enemy;
         // Difficulty scales with BOTH the level reached AND the wave number, so
         // later waves within a level get tankier (fixes "tower solos everything").
+        // Plus a capped late-game ramp from Level 4 onward (see constructor) to
+        // keep pace with the player's expanding toolkit. Bosses ramp at half
+        // rate since they're already crisis-tuned.
+        const id = this.level ? this.level.id : 0;
+        const isBossType = typeof type === "string" && type.indexOf("boss_") === 0;
+        const lateHp = (!this.isEndless && id >= this.LATE_RAMP_START_ID)
+            ? Math.min(this.LATE_HP_CAP, (id - (this.LATE_RAMP_START_ID - 1)) * this.LATE_HP_PER_LEVEL * (isBossType ? 0.5 : 1))
+            : 0;
         const scale = this.isEndless
             ? 1.0 + (this.waveNumber * 0.14)
-            : 1.0 + (this.level.id * 0.28) + ((this.waveNumber - 1) * 0.07);
+            : 1.0 + (this.level.id * 0.28) + ((this.waveNumber - 1) * 0.07) + lateHp;
 
         // Prefer the data-driven registry (all new enemies + bosses live here);
         // fall back to the original hardcoded set if the registry isn't loaded.

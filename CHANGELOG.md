@@ -5,6 +5,28 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-04 — Late-game difficulty ramp (levels felt too easy after Level 3)
+
+After Level 3 the player unlocks extra tower disciplines (Chemistry L4, Astronomy L5, Volcano L6,
+all by L7) **plus** full level-3 upgrades and specialisations — a big power spike. Enemy difficulty,
+however, only grew `+0.28 scale/level` (≈ +8% HP/level), so player power outpaced it and later
+levels felt boring/trivial.
+
+- **`game.js`:** added a **capped late-game ramp** that only applies from Level 4 (`id >= 3`) — levels
+  1–3 are completely unchanged. Two levers, both tunable via named constructor constants
+  (`LATE_HP_PER_LEVEL`, `LATE_HP_CAP`, `LATE_COUNT_PER_LEVEL`, `LATE_COUNT_CAP`):
+  - **Tankier enemies** — extra HP-scale per level past L3 in `spawnEnemy()`, capped (≈ +74% HP by
+    L16+). Bosses ramp at **half rate** (they're already crisis-tuned) so they stay beatable.
+  - **Bigger waves** — a per-level enemy-count multiplier in `startNextWave()`, capped at +60%. Boss
+    spawners are **never** multiplied (so we can't accidentally spawn extra bosses).
+- **Resulting curve** (normal enemy HP / wave size vs. the old values): L4 +5% / ×1.07 → L7 +19% /
+  ×1.28 → L10 +36% / ×1.49 → L15+ +70-74% / ×1.60 (capped). The point: later levels now demand the
+  full toolkit — multiple disciplines, specialisations, heroes, and battle items — instead of one
+  spammed tower.
+- **Verified live + tests:** L1–3 HP/wave-size identical to before; L4+ strictly tankier with bigger
+  waves; bosses gentler and boss counts never multiplied; no console errors. Suite **53/53**
+  (+2 ramp tests).
+
 ## 2026-06-04 — Battle items (RP consumables) + fix topic/exam selection resetting
 
 **Bug: Topic/Exam kept resetting to "Yearly."** `populateTopicDropdown()` (index.html) rebuilds the

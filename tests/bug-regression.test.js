@@ -841,6 +841,52 @@ check("Battle items: mercenaries spawn blockers; selecting a targeted item enter
   if (g.isTargetingItem) throw new Error("cancel must clear item aim mode");
 });
 
+// ===========================================================================
+// Late-game difficulty ramp: levels 1-3 untouched; Level 4+ gets tankier
+// enemies AND bigger waves; boss counts are never multiplied.
+// ===========================================================================
+
+check("Late ramp: L1-3 HP unchanged; L4+ enemies tankier than the old curve", () => {
+  const mkGame = (id) => {
+    const g = new globalThis.Game();
+    g.isEndless = false; g.waveNumber = 1; g.enemies = [];
+    g.recordBestiaryEncounter = () => {};
+    g.level = { id, waypoints: [{ x: 0, y: 0 }, { x: 100, y: 0 }], waves: [[{ type: "flatearth", count: 10, delay: 1000 }]] };
+    return g;
+  };
+  const hpOf = (g) => { g.enemies = []; g.spawnEnemy("flatearth"); return g.enemies[0].maxHealth; };
+
+  // Level 3 (id 2): no ramp -> equals the original formula exactly.
+  const baseL3 = 121 * Math.pow(1.32, 1.0 + 2 * 0.28);
+  if (Math.abs(hpOf(mkGame(2)) - baseL3) > 0.5) throw new Error("Levels 1-3 HP must be unchanged");
+  // Level 4 (id 3): ramped -> strictly tankier than the old curve at the same level.
+  const oldL4 = 121 * Math.pow(1.32, 1.0 + 3 * 0.28);
+  if (!(hpOf(mkGame(3)) > oldL4 * 1.01)) throw new Error("Level 4 enemies should be tankier than the old curve");
+  // Monotonic: L7 tankier than L4.
+  if (!(hpOf(mkGame(6)) > hpOf(mkGame(3)))) throw new Error("ramp should keep growing with level");
+});
+
+check("Late ramp: L4+ waves are bigger; boss spawner counts are never multiplied", () => {
+  const mkGame = (id, waves) => {
+    const g = new globalThis.Game();
+    g.isEndless = false; g.waveNumber = 0; g.isWaveActive = false; g.spawnQueue = [];
+    g.heroes = []; g.summonedMinions = []; g.updateSidebarUI = () => {};
+    g.level = { id, waypoints: [{ x: 0, y: 0 }], waves };
+    return g;
+  };
+  const normalWave = [[{ type: "flatearth", count: 10, delay: 1000 }]];
+  const g3 = mkGame(2, normalWave); g3.startNextWave(false);
+  if (g3.spawnQueue.length !== 10) throw new Error("Level 3 wave size must be unchanged (10)");
+  const g4 = mkGame(3, normalWave); g4.startNextWave(false);
+  if (!(g4.spawnQueue.length > 10)) throw new Error("Level 4 wave should spawn more enemies");
+
+  // A boss spawner (count 1) at a high level must stay exactly 1 despite the count ramp.
+  const gb = mkGame(9, [[{ type: "boss_geo", count: 1, delay: 1000 }, { type: "flatearth", count: 10, delay: 800 }]]);
+  gb.startNextWave(false);
+  const bosses = gb.spawnQueue.filter(s => s.type === "boss_geo").length;
+  if (bosses !== 1) throw new Error("boss count must never be multiplied by the wave ramp");
+});
+
 // ---- Report ---------------------------------------------------------------
 let pass = 0;
 for (const [ok, name, msg] of results) {
