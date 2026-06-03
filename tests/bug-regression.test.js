@@ -786,6 +786,61 @@ check("Ability bar is never stuck hidden: deselecting the tower by ANY path rest
   if (bar.style.display !== "flex") throw new Error("bar must reappear the moment no tower is selected (the 'blocked ability' bug)");
 });
 
+// ===========================================================================
+// Battle items (RP-purchased consumables): cost/cooldown gating + effects.
+// ===========================================================================
+
+const mkEnemy = (x, y) => ({ x, y, isDead: false, hits: 0,
+  takeDamage(d, t) { this.hits++; this.lastDmg = d; this.lastType = t; },
+  applySlow(f, s) { this.slow = f; } });
+
+check("Battle items: cast spends RP + starts cooldown; broke/on-cooldown is a no-op", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing"; g.updateSidebarUI = () => {}; g.enemies = [];
+  const cost = globalThis.window.BATTLE_ITEMS_BY_KEY.meteor.cost;
+  g.researchPoints = cost + 5;
+  if (g.castBattleItem("meteor", 100, 100) !== true) throw new Error("should cast with enough RP");
+  if (g.researchPoints !== 5) throw new Error("RP not deducted correctly");
+  if (!(g.itemCooldowns.meteor > 0)) throw new Error("cooldown should be set after casting");
+  // immediately again -> blocked by cooldown, no RP change
+  g.researchPoints = 999;
+  if (g.castBattleItem("meteor", 100, 100) !== false) throw new Error("must be blocked while on cooldown");
+  if (g.researchPoints !== 999) throw new Error("no RP spent when blocked");
+  // insufficient RP
+  g.itemCooldowns = {}; g.researchPoints = 1;
+  if (g.castBattleItem("bomb", 0, 0) !== false) throw new Error("must be blocked with insufficient RP");
+});
+
+check("Battle items: meteor hits only enemies in radius (true dmg); cryo freezes all", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing"; g.updateSidebarUI = () => {}; g.researchPoints = 9999;
+  const near = mkEnemy(100, 100), far = mkEnemy(700, 600);
+  g.enemies = [near, far];
+  g.castBattleItem("meteor", 100, 100);
+  if (near.hits !== 1) throw new Error("enemy inside radius should take meteor damage");
+  if (far.hits !== 0) throw new Error("enemy outside radius must not be hit");
+  if (near.lastType !== "true") throw new Error("meteor should deal armor-piercing true damage");
+  g.itemCooldowns = {};
+  g.castBattleItem("cryo", 0, 0);
+  if (near.slow === undefined || far.slow === undefined) throw new Error("cryo must slow/freeze every enemy on screen");
+});
+
+check("Battle items: mercenaries spawn blockers; selecting a targeted item enters aim mode", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing"; g.updateSidebarUI = () => {}; g.researchPoints = 9999;
+  g.enemies = []; g.summonedMinions = [];
+  g.castBattleItem("merc", 200, 200);
+  const merc = globalThis.window.BATTLE_ITEMS_BY_KEY.merc;
+  if (g.summonedMinions.length !== merc.mercs) throw new Error("should spawn the configured number of mercenaries");
+  if (g.summonedMinions[0].constructor.name !== "SummonedMinion") throw new Error("mercenaries should be SummonedMinion blockers");
+  // selecting a targeted item arms aim mode rather than firing instantly
+  g.itemCooldowns = {};
+  g.selectBattleItem("bomb");
+  if (!g.isTargetingItem || g.activeItemKey !== "bomb") throw new Error("targeted item should enter aim mode on select");
+  g.cancelSkillTargeting();
+  if (g.isTargetingItem) throw new Error("cancel must clear item aim mode");
+});
+
 // ---- Report ---------------------------------------------------------------
 let pass = 0;
 for (const [ok, name, msg] of results) {

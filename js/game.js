@@ -1,6 +1,22 @@
 // js/game.js
 // Main Game Controller and Engine for Science Tower Defense
 
+// Battle items — RP-purchased consumables usable during a level (Realm-Defense
+// style). `targeted` items are aimed on the battlefield; others fire instantly.
+// Costs/cooldowns are balanced defaults and easy to tune.
+const BATTLE_ITEMS = [
+    { key: "cryo",   name: "Cryo Field",  icon: "❄️", cost: 30, cooldownSec: 25, targeted: false, color: "#7fdfff", freezeSec: 3,
+      desc: "Freezes every enemy on screen for 3s while your towers keep firing." },
+    { key: "meteor", name: "Meteor",      icon: "☄️", cost: 25, cooldownSec: 16, targeted: true, color: "#ff7b3a", radius: 115, damage: 320,
+      desc: "Calls down a meteor for massive true-damage in a large area." },
+    { key: "bomb",   name: "Mini Bomb",   icon: "💣", cost: 12, cooldownSec: 7,  targeted: true, color: "#ffd166", radius: 72,  damage: 130,
+      desc: "Cheap burst of explosive damage in a small area." },
+    { key: "merc",   name: "Mercenaries", icon: "🗡️", cost: 35, cooldownSec: 30, targeted: true, color: "#c0a062", mercs: 2, mercHp: 160, mercDmg: 22, mercSec: 18,
+      desc: "Drops 2 sellswords that block & fight enemies for 18s." },
+];
+const BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS.reduce((m, it) => { m[it.key] = it; return m; }, {});
+if (typeof window !== "undefined") { window.BATTLE_ITEMS = BATTLE_ITEMS; window.BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS_BY_KEY; }
+
 const ASSETS_MANIFEST = {
     // UI/Backgrounds
     "bg_menu": "assets/ui/fantasy_bg.png",
@@ -202,6 +218,12 @@ class Game {
         this.isTargetingSkill = false; // Hero active targeting state
         this.targetingHeroIndex = -1;  // which hero's ability is being aimed
         this._upgradeHideTimer = null; // auto-dismiss timer for the tower upgrade menu
+        // Battle items (RP-purchased consumables, Realm-Defense style)
+        this.itemCooldowns = {};       // item key -> frames of cooldown remaining
+        this.isTargetingItem = false;  // aiming a targeted item (meteor/bomb/merc)
+        this.activeItemKey = null;
+        this._cryoUntil = 0;           // performance.now() ts until which the cryo freeze overlay shows
+        this._itemBarBuilt = false;
         this.ideaBubbles = [];
         this.bubbleSpawnTimer = 300; // spawn bubble every few seconds
 
@@ -486,7 +508,7 @@ class Game {
 
         // Right-click cancels skill aiming (and never pops the browser menu on the board).
         this.canvas.addEventListener("contextmenu", (e) => {
-            if (this.isTargetingSkill) { e.preventDefault(); this.cancelSkillTargeting(); }
+            if (this.isTargetingSkill || this.isTargetingItem) { e.preventDefault(); this.cancelSkillTargeting(); }
         });
 
         // Keyboard shortcuts: 1–4 trigger each hero's ability (press → aim),
@@ -522,6 +544,17 @@ class Game {
                     this.triggerQuestionPopup();
                     return;
                 }
+            }
+
+            // 1b. Deploying a targeted battle item (meteor / bomb / mercenaries)
+            if (this.isTargetingItem && this.activeItemKey) {
+                const key = this.activeItemKey;
+                const cast = this.castBattleItem(key, clickX, clickY);
+                this.isTargetingItem = false;
+                this.activeItemKey = null;
+                this.canvas.style.cursor = "default";
+                if (cast) this.showInGameNotification(`${BATTLE_ITEMS_BY_KEY[key].name} deployed!`);
+                return;
             }
 
             // 2. Check if in active skill targeting mode
@@ -847,6 +880,11 @@ class Game {
     update() {
         if (this.gameState !== "playing" || this.isPaused) return;
 
+        // Battle-item cooldowns tick down (frame-based, so 2× speed scales it).
+        for (const k in this.itemCooldowns) {
+            if (this.itemCooldowns[k] > 0) this.itemCooldowns[k]--;
+        }
+
         // Music: boss theme while a boss is on the field, else the level's
         // battle loop. playMusic is idempotent so calling each tick is cheap.
         if (window.audioManager) {
@@ -1092,6 +1130,18 @@ class Game {
 
             // Keep the hero ability bar's cooldown/revive sweep smooth.
             this.renderHeroAbilityBar();
+            this.renderBattleItems();
+
+            // Cryo Field freeze overlay — frosty vignette while active.
+            if (performance.now() < this._cryoUntil) {
+                this.ctx.save();
+                const g = this.ctx.createRadialGradient(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.25, GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.75);
+                g.addColorStop(0, "rgba(150,225,255,0.04)");
+                g.addColorStop(1, "rgba(120,210,255,0.28)");
+                this.ctx.fillStyle = g;
+                this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.ctx.restore();
+            }
 
             // Boss health bar (top-center) when a boss is on the field.
             const boss = this.enemies.find(e => e.isBoss);
@@ -1233,6 +1283,54 @@ class Game {
                 this.ctx.fillText(label, bx, by + 2);
                 this.ctx.restore();
             }
+
+            // Battle-item aim overlay (meteor / bomb / mercenaries).
+            if (this.isTargetingItem && this.activeItemKey) {
+                const def = BATTLE_ITEMS_BY_KEY[this.activeItemKey];
+                const ax = this.mouseX, ay = this.mouseY;
+                const r = def.radius || 48;
+                const t = performance.now() / 1000;
+                const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+                this.ctx.save();
+                this.ctx.fillStyle = "rgba(4,2,12,0.22)";
+                this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+                // AoE / placement ring at the cursor
+                this.ctx.globalAlpha = 0.13 + 0.07 * pulse;
+                this.ctx.fillStyle = def.color;
+                this.ctx.beginPath();
+                this.ctx.arc(ax, ay, r, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.globalAlpha = 0.9;
+                this.ctx.strokeStyle = def.color;
+                this.ctx.lineWidth = 2.5;
+                this.ctx.setLineDash([10, 7]);
+                this.ctx.lineDashOffset = -((t * 40) % 17);
+                this.ctx.beginPath();
+                this.ctx.arc(ax, ay, r, 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                // icon at the cursor
+                this.ctx.globalAlpha = 1;
+                this.ctx.font = "22px 'Nunito', sans-serif";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(def.icon, ax, ay + 8);
+
+                // banner
+                const label = `${def.icon} ${def.name} — click to deploy · Esc to cancel`;
+                this.ctx.font = "bold 14px 'Nunito', sans-serif";
+                const tw = this.ctx.measureText(label).width;
+                const bx = GAME_WIDTH / 2, by = 44;
+                this.ctx.fillStyle = "rgba(0,0,0,0.72)";
+                this.ctx.fillRect(bx - tw / 2 - 14, by - 16, tw + 28, 26);
+                this.ctx.strokeStyle = def.color;
+                this.ctx.lineWidth = 2;
+                this.ctx.strokeRect(bx - tw / 2 - 14, by - 16, tw + 28, 26);
+                this.ctx.fillStyle = "#fff";
+                this.ctx.fillText(label, bx, by + 2);
+                this.ctx.restore();
+            }
         }
     }
 
@@ -1323,11 +1421,125 @@ class Game {
 
     // Leave skill-aim mode without casting (Esc / right-click / clicking the bar again).
     cancelSkillTargeting() {
+        if (this.isTargetingItem) {
+            this.isTargetingItem = false;
+            this.activeItemKey = null;
+            this.canvas.style.cursor = "default";
+            this.showInGameNotification("Item aim cancelled.");
+            return;
+        }
         if (!this.isTargetingSkill) return;
         this.isTargetingSkill = false;
         this.targetingHeroIndex = -1;
         this.canvas.style.cursor = "default";
         this.showInGameNotification("Ability aim cancelled.");
+    }
+
+    // ---- Battle items (RP consumables) -----------------------------------
+    // Clicking an item button: instant items fire now; targeted items enter
+    // aim mode (reusing the same overlay/click-to-cast flow as hero skills).
+    selectBattleItem(key) {
+        if (this.gameState !== "playing") return;
+        const def = BATTLE_ITEMS_BY_KEY[key];
+        if (!def) return;
+        if ((this.itemCooldowns[key] || 0) > 0) {
+            this.showInGameNotification(`${def.name} is recharging (${Math.ceil(this.itemCooldowns[key] / 60)}s)`);
+            return;
+        }
+        if (this.researchPoints < def.cost) {
+            this.showInGameNotification(`Need ${def.cost} RP for ${def.name} — answer revision questions to earn RP!`);
+            return;
+        }
+        if (def.targeted) {
+            // enter aim mode (cancel any hero aim / tower menu first)
+            this.isTargetingSkill = false;
+            this.targetingHeroIndex = -1;
+            this.hideTowerUpgradeMenu();
+            this.isTargetingItem = true;
+            this.activeItemKey = key;
+            this.canvas.style.cursor = "crosshair";
+            this.showInGameNotification(`🎯 ${def.icon} ${def.name} — click the battlefield to deploy (Esc to cancel)`);
+        } else {
+            this.castBattleItem(key, 0, 0);
+        }
+    }
+
+    castBattleItem(key, x, y) {
+        const def = BATTLE_ITEMS_BY_KEY[key];
+        if (!def) return false;
+        if ((this.itemCooldowns[key] || 0) > 0 || this.researchPoints < def.cost) return false;
+
+        this.researchPoints -= def.cost;
+        this.itemCooldowns[key] = def.cooldownSec * 60;
+        const ps = this.particleSystem;
+
+        if (key === "cryo") {
+            // Freeze every enemy on screen; towers keep firing.
+            this._cryoUntil = performance.now() + def.freezeSec * 1000;
+            this.enemies.forEach(e => { if (!e.isDead && e.applySlow) e.applySlow(0.04, def.freezeSec); });
+            if (ps) {
+                this.enemies.forEach(e => ps.createExplosion(e.x, e.y, "#bff4ff", 6, 2));
+                ps.addFloatingText(GAME_WIDTH / 2, 80, "❄️ CRYO FIELD!", def.color, 20, 1.6);
+            }
+            if (window.audioManager) window.audioManager.playSfx("hero_curie_skill");
+        } else if (key === "meteor" || key === "bomb") {
+            if (ps) {
+                ps.createExplosion(x, y, def.color, key === "meteor" ? 40 : 22, key === "meteor" ? 6 : 4);
+                ps.createShockwave(x, y, def.radius, def.color, 6, 3);
+                ps.addFloatingText(x, y - 20, def.icon + " " + def.name + "!", def.color, 16, 1.4);
+            }
+            this.enemies.forEach(e => {
+                if (e.isDead) return;
+                if (Math.hypot(e.x - x, e.y - y) <= def.radius) e.takeDamage(def.damage, "true");
+            });
+            if (window.audioManager) window.audioManager.playSfx("base_hit");
+        } else if (key === "merc") {
+            const spread = 26;
+            for (let i = 0; i < (def.mercs || 2); i++) {
+                const mx = x + (i === 0 ? -spread : spread);
+                const m = new SummonedMinion(mx, y, def.mercHp, def.mercDmg, 22, def.mercSec, "Mercenary", def.color);
+                this.summonedMinions.push(m);
+            }
+            if (ps) {
+                ps.createShockwave(x, y, 50, def.color, 3, 2);
+                ps.addFloatingText(x, y - 20, "🗡️ MERCENARIES!", def.color, 15, 1.4);
+            }
+            if (window.audioManager) window.audioManager.playSfx("tower_barracks_place");
+        }
+
+        this.updateSidebarUI();
+        return true;
+    }
+
+    // Build the item buttons once; refresh affordability/cooldown every frame.
+    renderBattleItems() {
+        const bar = document.getElementById("battle-items");
+        if (!bar) return;
+        if (!this._itemBarBuilt || bar.childElementCount !== BATTLE_ITEMS.length) {
+            bar.innerHTML = "";
+            BATTLE_ITEMS.forEach(def => {
+                const btn = document.createElement("button");
+                btn.className = "item-btn";
+                btn.id = `item-btn-${def.key}`;
+                btn.title = def.desc;
+                btn.innerHTML = `<span class="item-cd"></span><span class="item-icon">${def.icon}</span><span class="item-name">${def.name}</span><span class="item-cost">${def.cost} RP</span>`;
+                btn.addEventListener("click", (e) => { e.stopPropagation(); this.selectBattleItem(def.key); });
+                bar.appendChild(btn);
+            });
+            this._itemBarBuilt = true;
+        }
+        BATTLE_ITEMS.forEach(def => {
+            const btn = document.getElementById(`item-btn-${def.key}`);
+            if (!btn) return;
+            const cd = this.itemCooldowns[def.key] || 0;
+            const affordable = this.researchPoints >= def.cost;
+            const ready = cd <= 0 && affordable;
+            btn.disabled = !ready;
+            btn.classList.toggle("armed", this.isTargetingItem && this.activeItemKey === def.key);
+            btn.classList.toggle("unaffordable", cd <= 0 && !affordable);
+            const cdEl = btn.querySelector(".item-cd");
+            if (cdEl) cdEl.style.height = cd > 0 ? `${(cd / (def.cooldownSec * 60)) * 100}%` : "0%";
+        });
     }
 
     renderHeroAbilityBar() {

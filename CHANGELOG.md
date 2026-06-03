@@ -5,6 +5,33 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-04 — Battle items (RP consumables) + fix topic/exam selection resetting
+
+**Bug: Topic/Exam kept resetting to "Yearly."** `populateTopicDropdown()` (index.html) rebuilds the
+`#select-topic` options every time the level-select screen is shown and hard-set `yearly.selected =
+true`, so a student's "Half-Yearly" choice was wiped each time they finished a level and returned.
+Fixed by capturing the current selection before the rebuild and restoring it afterwards (falling back
+to Yearly only when the prior value isn't valid for the chosen year). Verified live: selection now
+survives repeated returns to level select.
+
+**Feature: Realm-Defense-style battle items.** A new "Battle Items (spend RP)" section in the sidebar
+lets players spend Research Points on consumables for the current level:
+- **❄️ Cryo Field (30 RP):** freezes every enemy on screen for 3 s while towers keep firing
+  (frosty screen vignette).
+- **☄️ Meteor (25 RP):** aimed; massive true-damage in a large radius.
+- **💣 Mini Bomb (12 RP):** aimed; cheap burst damage in a small radius.
+- **🗡️ Mercenaries (35 RP):** aimed; drops 2 `SummonedMinion` blockers that fight for 18 s.
+- **Implementation (`game.js`):** `BATTLE_ITEMS` table + `selectBattleItem`/`castBattleItem`/
+  `renderBattleItems`. Instant items fire on click; targeted items reuse the hero-skill aim overlay
+  (dimmed field, pulsing AoE ring, icon, "click to deploy · Esc to cancel" banner; right-click/Esc
+  cancel). Each item has an RP cost + a cooldown (ticked in `update()`, shown as a sweep on the
+  button). All costs/cooldowns are easy to tune.
+  - `style.css`: `.item-bar` / `.item-btn` (2×2 grid, cooldown sweep, armed/unaffordable states).
+- **Verified live:** item bar renders; Cryo freezes all enemies (+25 s CD); Meteor aim overlay shows,
+  click deploys and hits only enemies in radius with true damage (+16 s CD); Mercenaries spawn; RP is
+  spent and gated (insufficient RP / on-cooldown are no-ops). No console errors. Suite **51/51**
+  (+3 item tests: cost/cooldown gating, radius damage + cryo freeze, mercenary spawn + aim mode).
+
 ## 2026-06-03 — Fix hero ability bar getting stuck hidden ("ability blocked")
 
 Follow-up to the overlap fix below. Hiding the ability bar imperatively in

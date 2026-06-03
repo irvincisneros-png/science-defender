@@ -420,6 +420,44 @@ select:focus {
     margin-top: 1px;
 }
 
+/* Battle Items (RP consumables) — 2x2 grid of compact buttons */
+.item-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+.item-btn {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 8px;
+    border-radius: 10px;
+    border: 2.5px solid #2a6f8e;
+    background: linear-gradient(to bottom, #16384a, #0d2230);
+    box-shadow: 0 3px 0 #000;
+    cursor: pointer;
+    text-align: left;
+}
+.item-btn:hover:not(:disabled) { border-color: #7fdfff; transform: translateY(-1px); }
+.item-btn .item-icon { font-size: 18px; line-height: 1; flex: none; }
+.item-btn .item-name { font-family: var(--font-heading); font-size: 8.5px; color: #d5f6ff; line-height: 1.1; }
+.item-btn .item-cost { font-size: 11px; font-weight: 800; color: var(--neon-cyan); margin-left: auto; }
+.item-btn.armed { border-color: #7fdfff !important; box-shadow: 0 0 10px rgba(127,223,255,0.7); }
+.item-btn:disabled { cursor: not-allowed; opacity: 0.85; }
+.item-btn.unaffordable .item-cost { color: #ff6b6b; }
+/* cooldown sweep fills from the bottom */
+.item-btn .item-cd {
+    position: absolute;
+    left: 0; bottom: 0; width: 100%;
+    background: rgba(0,0,0,0.6);
+    pointer-events: none;
+    transition: height 0.1s linear;
+}
+
 /* Hero card container */
 .hud-hero-skills-section {
     flex: 1;

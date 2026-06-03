@@ -159,6 +159,11 @@
                     </div>
                 </div>
 
+                <h2>Battle Items <span style="font-size:9px; color:#7fdfff; font-weight:600;">(spend RP)</span></h2>
+                <div id="battle-items" class="item-bar">
+                    <!-- Filled dynamically in gameInstance.renderBattleItems() -->
+                </div>
+
                 <h2>Science Heroes</h2>
                 <div id="hud-hero-skills" class="hud-hero-skills-section">
                     <!-- Filled dynamically in gameInstance.updateSidebarUI() -->
@@ -299,6 +304,9 @@
         function populateTopicDropdown() {
             const year = parseInt(document.getElementById("select-year").value, 10);
             const topicSel = document.getElementById("select-topic");
+            // Remember the current choice so returning to level select (e.g. after
+            // completing a level) doesn't silently reset it back to "Yearly".
+            const prev = topicSel.value;
             const meta = (window.TOPIC_META && window.TOPIC_META[year]) || [];
             topicSel.innerHTML = "";
             meta.forEach((t, i) => {
@@ -314,8 +322,11 @@
             const yearly = document.createElement("option");
             yearly.value = "yearly";
             yearly.textContent = "📚 Yearly Exam (All Topics)";
-            yearly.selected = true;
             topicSel.appendChild(yearly);
+            // Restore the previous selection if it's still a valid option for this
+            // year; otherwise default to the Yearly exam (first-time / year switch).
+            const stillValid = prev && Array.prototype.some.call(topicSel.options, o => o.value === prev);
+            topicSel.value = stillValid ? prev : "yearly";
             updateQuestionPool();
         }
 
