@@ -467,6 +467,19 @@ class Game {
         this.nextWaveCountdown = 0;
         this.gameSpeed = 1;
 
+        // Battle items + aim modes are per-run state: cooldowns must not carry
+        // over from the previous level/attempt, and abandoning mid-aim must not
+        // start the next level stuck in targeting mode with a crosshair cursor.
+        this.itemCooldowns = {};
+        this.isTargetingItem = false;
+        this.activeItemKey = null;
+        this.isTargetingSkill = false;
+        this.targetingHeroIndex = -1;
+        this._cryoUntil = 0;
+        if (this.canvas) this.canvas.style.cursor = "default";
+        const qModal = document.getElementById("question-modal");
+        if (qModal) qModal.style.display = "none";
+
         // Clear pools
         this.towers = [];
         this.enemies = [];
@@ -1003,6 +1016,11 @@ class Game {
         });
 
         // 7. Update Enemies
+        // Enemies spawned by deaths (e.g. Spontaneous Generation maggots) must
+        // NOT be pushed into the array while filter() iterates it — appended
+        // elements are never visited, so they'd be silently dropped when the
+        // filtered array is assigned back. Collect them and append afterwards.
+        const bornThisFrame = [];
         this.enemies = this.enemies.filter(e => {
             const alive = e.update(this.particleSystem, this.enemies);
             
@@ -1057,7 +1075,7 @@ class Game {
                         const maggot = new SpontaneousEnemy(e.x + (i*10 - 5), e.y + (i*10 - 5), e.levelScale, true);
                         maggot.waypoints = e.waypoints;
                         maggot.currentWaypointIndex = e.currentWaypointIndex;
-                        this.enemies.push(maggot);
+                        bornThisFrame.push(maggot);
                     }
                 }
 
@@ -1066,6 +1084,7 @@ class Game {
 
             return alive;
         });
+        if (bornThisFrame.length) this.enemies.push(...bornThisFrame);
 
         // 8. Update Particles
         this.particleSystem.update();
@@ -1948,6 +1967,7 @@ class Game {
     }
 
     solveBranchAnswer(index) {
+        if (!this.currentBranchQuestion) return; // modal already closed/cleared
         const feedback = document.getElementById("q-feedback");
         const closeBtn = document.getElementById("q-close");
         document.querySelectorAll(".opt-btn").forEach(b => b.disabled = true);
@@ -1956,7 +1976,9 @@ class Game {
         feedback.style.display = "block";
         closeBtn.style.display = "block";
 
-        if (correct && this.pendingBranch) {
+        // The tower must still be on the field (it can't normally be sold while
+        // the modal is up, but never specialize a ghost reference).
+        if (correct && this.pendingBranch && this.towers.includes(this.pendingBranch.tower)) {
             const { tower, branchKey, cost } = this.pendingBranch;
             this.researchPoints -= cost;
             tower.chooseBranch(branchKey);
@@ -2126,8 +2148,23 @@ class Game {
         this.updateSidebarUI();
     }
 
+    // End-of-level housekeeping shared by victory and defeat: any open modal or
+    // aim mode must not survive into the end screen / next playthrough.
+    _closeBattleOverlays() {
+        const qModal = document.getElementById("question-modal");
+        if (qModal) qModal.style.display = "none";
+        const pModal = document.getElementById("pause-modal");
+        if (pModal) pModal.style.display = "none";
+        this.isTargetingItem = false;
+        this.activeItemKey = null;
+        this.isTargetingSkill = false;
+        this.targetingHeroIndex = -1;
+        if (this.canvas) this.canvas.style.cursor = "default";
+    }
+
     triggerVictory() {
         this.gameState = "victory";
+        this._closeBattleOverlays();
         if (window.audioManager) window.audioManager.playStinger("victory");
 
         // Star rating from lives remaining (only persisted for campaign levels).
@@ -2160,6 +2197,7 @@ class Game {
 
     triggerDefeat() {
         this.gameState = "defeat";
+        this._closeBattleOverlays();
         if (window.audioManager) window.audioManager.playStinger("defeat");
 
         document.getElementById("defeat-details").innerHTML = `

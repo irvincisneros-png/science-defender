@@ -33,6 +33,9 @@ class Projectile {
             let closest = null;
             let minDist = 150;
             enemies.forEach(e => {
+                // Dead/leaked enemies linger in the array until end-of-frame
+                // cleanup — retargeting one would waste the shot on a corpse.
+                if (e.isDead || e.reachedEnd) return;
                 const dist = Math.hypot(e.x - this.x, e.y - this.y);
                 if (dist < minDist) {
                     minDist = dist;

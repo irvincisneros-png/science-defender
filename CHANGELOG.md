@@ -5,6 +5,36 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-12 — Audit: 4 gameplay bugs fixed (split enemies, stale per-run state, corpse retargeting)
+
+Full code audit (logic + rendering). Confirmed and fixed:
+
+- **Spontaneous Generation never actually split.** `game.js` pushed the 2 maggots into
+  `this.enemies` *while* `filter()` was iterating it; elements appended mid-iteration are never
+  visited by `filter`, so they were silently dropped when the filtered array was assigned back.
+  The signature mechanic of that enemy simply didn't happen. Fix: collect spawns in
+  `bornThisFrame[]` and append after the filter completes. (The audit originally suspected a
+  *double-award* here — the real bug was the opposite: the maggots never existed.)
+- **Battle-item cooldowns + aim modes leaked across runs.** `startLevel()` reset gold/lives/pools
+  but not `itemCooldowns` (items stayed "recharging" into the next level/replay) nor
+  `isTargetingItem`/`isTargetingSkill`/cursor (abandoning mid-aim started the next level stuck in
+  crosshair aim mode). The question modal is also force-hidden defensively. (`game.js:startLevel`)
+- **Projectiles could retarget corpses.** When a projectile's target died mid-flight it retargeted
+  the closest enemy *without* checking `isDead`/`reachedEnd` — dead/leaked enemies linger in the
+  array until end-of-frame cleanup, so shots could be wasted on corpses. (`towers.js:Projectile.update`)
+- **End-of-level overlay cleanup.** `triggerVictory`/`triggerDefeat` now close the question/pause
+  modals and cancel any aim mode via shared `_closeBattleOverlays()`; `solveBranchAnswer` guards
+  against a cleared question/sold tower. All defensive — these paths were hard but not impossible
+  to hit (e.g. defeat triggered by a leak on the exact frame a modal opened).
+
+Dismissed after verification (audit claims that didn't hold up): battle-item double-cast race
+(both gates already check synchronously), `applySlow` guard order (both are early returns — order
+is irrelevant), hero death at exactly 0 HP (line 289 is a clamp; the real check at line 321 uses
+`<=` and runs in the same tick).
+
+**Verified:** suite **57/57** (+4 new regression tests covering each fix; harness gained
+`createElement`/`querySelector` stubs that `startLevel`'s UI rebuild needs headless).
+
 ## 2026-06-04 — Late-game difficulty ramp (levels felt too easy after Level 3)
 
 After Level 3 the player unlocks extra tower disciplines (Chemistry L4, Astronomy L5, Volcano L6,

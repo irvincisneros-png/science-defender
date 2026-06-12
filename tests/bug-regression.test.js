@@ -33,6 +33,7 @@ function makeEl(id) {
     get textContent() { return this._text; },
     addEventListener() {},
     appendChild() {},
+    querySelector() { return makeEl("child"); },
     querySelectorAll() { return []; },
     getContext() { return ctx; },
     width: 0, height: 0,
@@ -53,6 +54,7 @@ globalThis.document = {
     if (sel === ".screen") return SCREEN_IDS.map((id) => elements.get(id));
     return [];
   },
+  createElement(tag) { return makeEl(tag); },
   addEventListener() {}, // audio.js attaches first-gesture unlock listeners at load
   removeEventListener() {},
 };
@@ -885,6 +887,83 @@ check("Late ramp: L4+ waves are bigger; boss spawner counts are never multiplied
   gb.startNextWave(false);
   const bosses = gb.spawnQueue.filter(s => s.type === "boss_geo").length;
   if (bosses !== 1) throw new Error("boss count must never be multiplied by the wave ramp");
+});
+
+// ===========================================================================
+// 2026-06-12 audit fixes
+// ===========================================================================
+
+// Spontaneous Generation maggots were pushed into this.enemies WHILE filter()
+// iterated it; appended elements are never visited by filter, so they were
+// silently dropped when the filtered array was assigned back (split never
+// happened). They must survive the death frame.
+check("Spontaneous split: maggots actually spawn when the parent dies", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing";
+  g.isPaused = false;
+  g.level = { id: 0, waypoints: [{ x: 0, y: 0 }, { x: 300, y: 0 }], waves: [[]], _basePoint: null };
+  g.updateSidebarUI = () => {};
+  g.itemCooldowns = {};
+  const parent = new globalThis.SpontaneousEnemy(50, 0, 1);
+  parent.setPath(g.level.waypoints);
+  parent.isDead = true; // killed this frame
+  g.enemies = [parent];
+  g.update();
+  const maggots = g.enemies.filter(e => e.isSubSpawn);
+  if (maggots.length !== 2) throw new Error(`expected 2 maggots to survive the frame, got ${maggots.length}`);
+  if (g.enemies.includes(parent)) throw new Error("dead parent should be removed");
+  // and sub-spawns must NOT split again
+  maggots.forEach(m => { m.isDead = true; });
+  g.update();
+  if (g.enemies.some(e => e.isSubSpawn)) throw new Error("maggot deaths must not re-split");
+});
+
+// Battle-item cooldowns and aim modes are per-run state: starting a new level
+// (or replaying) must clear them, or items stay "recharging" across levels and
+// an abandoned mid-aim run starts the next one stuck in targeting mode.
+check("startLevel resets item cooldowns, aim modes and the question modal", () => {
+  const g = new globalThis.Game();
+  g.itemCooldowns = { meteor: 900 };
+  g.isTargetingItem = true;
+  g.activeItemKey = "meteor";
+  g.isTargetingSkill = true;
+  document.getElementById("question-modal").style.display = "flex";
+  g.startLevel(0);
+  if (Object.keys(g.itemCooldowns).length !== 0) throw new Error("itemCooldowns must reset on level start");
+  if (g.isTargetingItem || g.activeItemKey) throw new Error("item aim mode must reset on level start");
+  if (g.isTargetingSkill) throw new Error("skill aim mode must reset on level start");
+  if (document.getElementById("question-modal").style.display !== "none")
+    throw new Error("question modal must be hidden on level start");
+});
+
+// Projectiles whose target died mid-flight retarget the closest enemy — but
+// must skip corpses/leaked enemies still awaiting end-of-frame cleanup.
+check("Projectile retarget skips dead and leaked enemies", () => {
+  const tgt = { x: 100, y: 0, isDead: true };
+  const p = new globalThis.Projectile(0, 0, tgt, 5, 10, "bullet");
+  const corpse = { x: 20, y: 0, isDead: true };
+  const leaked = { x: 30, y: 0, isDead: false, reachedEnd: true };
+  const live = { x: 60, y: 0, isDead: false };
+  p.update([corpse, leaked, live, tgt], new globalThis.ParticleSystem());
+  if (p.target !== live) throw new Error("should retarget the living enemy, not a corpse/leaker");
+});
+
+// Victory/defeat with a modal open (or mid-aim) must close battle overlays.
+check("triggerDefeat closes question/pause modals and cancels aim modes", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing";
+  g.level = { name: "T", waves: [1] };
+  g.waveNumber = 1;
+  g.isTargetingItem = true;
+  g.activeItemKey = "bomb";
+  document.getElementById("question-modal").style.display = "flex";
+  document.getElementById("pause-modal").style.display = "flex";
+  g.triggerDefeat();
+  if (document.getElementById("question-modal").style.display !== "none")
+    throw new Error("question modal must close on defeat");
+  if (document.getElementById("pause-modal").style.display !== "none")
+    throw new Error("pause modal must close on defeat");
+  if (g.isTargetingItem) throw new Error("aim mode must cancel on defeat");
 });
 
 // ---- Report ---------------------------------------------------------------
