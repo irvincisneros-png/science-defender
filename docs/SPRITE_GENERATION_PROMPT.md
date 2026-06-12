@@ -329,9 +329,43 @@ heat_death  — HEAT DEATH OF THE UNIVERSE: final cold dark void, dying embers, 
               stars, near-black with faint orange entropy glow.
 
 ═══════════════════════════════════════════════════════════════════
+BATCH 5 — PROJECTILE SPRITES  (save to assets/projectiles/)
+Single STATIC images — NOT animated strips. The engine spins each projectile
+continuously in flight and adds a coloured motion trail in code, so one good
+frame is all that's needed. Draw each at 64×64 px, transparent background
+(rendered in-game at 24×24, so generate clean + readable at small size).
+Design each to read well WHILE ROTATING (compact, centred, no long static
+"up" orientation needed — assume it tumbles).
+═══════════════════════════════════════════════════════════════════
+flask   — Chemistry lobbed ACID FLASK (ORANGE #ff6600): round-bottom glass
+          flask, glowing orange liquid sloshing, tiny cork, glass shine.
+          → assets/projectiles/flask.png  (64×64)
+spore   — Biology SPORE NEEDLE (GREEN #00ff66): plump thorn/seed-pod dart,
+          glowing green tip, tiny trailing spore flecks baked into the sprite.
+          → assets/projectiles/spore.png  (64×64)
+bullet  — Physics TESLA BOLT (CYAN #00ffff): condensed crackling energy slug,
+          white-hot core with cyan electric arcs hugging it.
+          → assets/projectiles/bullet.png (64×64)
+gravity — Astronomy GRAVITY ORB (PURPLE #bf55ec): miniature swirling
+          singularity, dark core, purple accretion swirl + white rim light.
+          → assets/projectiles/gravity.png (64×64)
+
+ENGINE WIRING (one-time, after the files exist): re-add the four keys to
+ASSETS_MANIFEST in game.js —
+  "proj_flask":   "assets/projectiles/flask.png",
+  "proj_spore":   "assets/projectiles/spore.png",
+  "proj_bullet":  "assets/projectiles/bullet.png",
+  "proj_gravity": "assets/projectiles/gravity.png",
+(The old proj_flask/proj_spore entries were REMOVED on 2026-06-12 because the
+files didn't exist and every load logged false "sprite not found" warnings —
+don't re-add the keys before the PNGs are in place. No SHEET_META entry needed:
+static images draw whole via the existing fallback tier, and
+Projectile.draw() already looks up `proj_<type>` and rotates it.)
+
+═══════════════════════════════════════════════════════════════════
 OUTPUT RULES
 ═══════════════════════════════════════════════════════════════════
-• Create folders assets/heroes, assets/towers, assets/enemies and assets/levels under PROJECT ROOT if missing.
+• Create folders assets/heroes, assets/towers, assets/enemies, assets/levels and assets/projectiles under PROJECT ROOT if missing.
 • Heroes, towers and ENEMIES: save with an ALPHA channel (transparent bg) at the
   EXACT pixel dimensions stated. LEVEL BACKGROUNDS (Batch 4) are the exception —
   they are full-bleed OPAQUE scenes at 1800×1100, no transparency, no path/UI baked in.
@@ -345,11 +379,14 @@ OUTPUT RULES
 ---
 
 ### Asset count
-- Heroes: 4 × 3 + tortoise × 2 = **14 sheets**.
-- Towers: 4 × 3 × 2 = **24 sheets**.
-- Enemies (Batch 3): 17 regular + 5 boss = **22 walk strips**.
-- Level backgrounds (Batch 4): **20 painted terrains**.
+- Heroes: 4 × 3 + tortoise × 2 = **14 sheets**. ✅ delivered 2026-06-02
+- Towers: 4 × 3 × 2 = **24 sheets**. ✅ delivered 2026-06-02
+- Enemies (Batch 3): 17 regular + 5 boss = **22 walk strips**. ✅ delivered 2026-06-02
+- Level backgrounds (Batch 4): **20 painted terrains**. ✅ delivered 2026-06-02
+- Projectiles (Batch 5): **4 static sprites**. ⬜ outstanding (added 2026-06-12;
+  currently vector-drawn with code trails — cosmetic upgrade only)
 
-Total **38 character/tower strips + 22 enemy strips + 20 backgrounds = 80 assets**.
+Total **38 character/tower strips + 22 enemy strips + 20 backgrounds + 4 projectiles
+= 84 assets** (80 of 84 delivered and verified loading in-game on 2026-06-12).
 The engine falls back to procedural vectors / `bgColor` until each PNG exists, so
 generate in any order — nothing breaks while Antigravity works.
