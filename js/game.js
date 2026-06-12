@@ -28,6 +28,13 @@ if (typeof window !== "undefined") { window.BATTLE_ITEMS = BATTLE_ITEMS; window.
 const ASSETS_MANIFEST = {
     // UI/Backgrounds
     "bg_menu": "assets/ui/fantasy_bg.png",
+
+    // Projectiles (Batch 5, generated 2026-06-12) — static images;
+    // Projectile.draw() spins them and adds the motion trail in code.
+    "proj_flask": "assets/projectiles/flask.png",
+    "proj_spore": "assets/projectiles/spore.png",
+    "proj_bullet": "assets/projectiles/bullet.png",
+    "proj_gravity": "assets/projectiles/gravity.png",
 };
 
 // ---- Animated sprite sheets (single-row strips) -------------------------

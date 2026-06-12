@@ -5,6 +5,20 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-12 — Batch 5 projectile sprites generated + wired (84/84 assets complete)
+
+Claude drove the Antigravity desktop app (computer control) to execute Batch 5 of
+`docs/SPRITE_GENERATION_PROMPT.md`: Gemini/Nano-Banana generated the 4 projectile sprites —
+**flask** (orange acid flask), **spore** (green spore needle), **bullet** (cyan tesla bolt),
+**gravity** (purple mini-singularity) — each a 64×64 transparent-background PNG in
+`assets/projectiles/`. Antigravity created only the 4 PNGs (verified via `git status`: no code
+touched); transparency/cutout was done by its mechanical PIL compositing step, per the doc's
+rules. Claude then re-added the four `proj_*` keys to `ASSETS_MANIFEST` (`game.js`) — static
+images, no SHEET_META needed; `Projectile.draw()` spins them and the code-drawn motion trail
+remains. **Verified:** suite 57/57; PIL check confirmed 64×64 RGBA with transparent corners
+(42–69% transparent area); live reload loads **85/85** assets with zero warnings; a mid-flight
+freeze confirmed projectiles render from the sprites. All 84 planned art assets now exist.
+
 ## 2026-06-12 — Remove 26 dead asset-manifest entries (misleading "sprite not found" warnings)
 
 The full sprite set (14 hero sheets, 24 tower sheets, 22 enemy walk strips, 20 level paintings —
