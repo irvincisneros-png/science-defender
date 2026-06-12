@@ -5,6 +5,41 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-12 — Visual polish pass: combat juice + rendering performance
+
+Realm-Defense-style "juice" (all procedural canvas/CSS, no new art assets — entity PNGs remain
+the planned upgrade once the roster is locked):
+
+- **Hit feedback (`enemies.js`):** white impact flash on every real hit (`hitFlash` set in
+  `takeDamage`, decays in `update`, drawn additively over the sprite). Pairs with the existing
+  squash-and-stretch.
+- **Walk bob (`enemies.js`):** enemies now hop along the path (vertical sine bob synced to the
+  existing rock-rotation); the drop shadow stays grounded and shrinks at hop apex.
+- **Tower life (`towers.js`):** idle breathing (per-tower phase offset), a 160 ms recoil pop on
+  fire, and a muzzle-flash particle burst in the tower's colour at the emitter.
+- **Projectile trails (`towers.js`):** every projectile leaves a short fading streak in its
+  discipline colour (5-point position history, drawn as tapered segments).
+- **Screen shake (`game.js`):** `addShake(mag, frames)` + linear decay, applied as a whole-scene
+  translate in `draw()`. Triggers: leaks (stronger for boss leaks), meteor/bomb battle items, and
+  boss kills. Background draws slightly oversized while shaking so canvas edges never peek through.
+- **Damage-number pop (`particles.js`):** floating texts land oversized and settle (~0.15 s),
+  so hits read instantly.
+- **Road rendering (`levels.js`):** the path is now layered — dark outer edging, packed-earth
+  body, worn lighter centre, faint cobble ticks, accent dashes — and rendered ONCE to an
+  offscreen canvas per level (WeakMap keyed by the run's cloned waypoint array), then blitted
+  each frame. Richer look *and* less per-frame stroke work.
+- **Render perf (`particles.js`, `game.js`):** particle glows now blit from a per-colour
+  pre-rendered sprite cache instead of building a radial gradient per particle per frame
+  (capped, with toxic/vortex hues quantized so the cache stays small); the cryo-field vignette
+  and boss-bar gradients are built once and reused.
+- **CSS (`style.css`):** shop buttons lift + glow on hover, affordable upgrade options glow,
+  locked quiz answers dim with `not-allowed` cursor.
+
+**Verified:** suite **57/57**; live playthrough of L1 (combat, battle items, victory screen,
+replay) with zero console errors; programmatic live checks confirmed hit-flash set/decay, shake
+on meteor, trail history, and the path actually serving from the offscreen cache. Maggot sprite
+lookups in the console during the wave confirmed the Spontaneous split fix is live in real play.
+
 ## 2026-06-12 — Audit: 4 gameplay bugs fixed (split enemies, stale per-run state, corpse retargeting)
 
 Full code audit (logic + rendering). Confirmed and fixed:

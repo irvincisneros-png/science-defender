@@ -389,11 +389,13 @@ select:focus {
     align-items: center;
     cursor: pointer;
     box-shadow: 0 4px 0 #000;
-    transition: transform 0.1s ease;
+    transition: transform 0.1s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .shop-btn:hover {
     border-color: var(--panel-border);
+    box-shadow: 0 4px 0 #000, 0 0 14px rgba(241, 196, 15, 0.35);
+    transform: translateY(-2px);
 }
 
 .shop-btn.active {
@@ -840,6 +842,12 @@ select:focus {
     box-shadow: 0 3px 0 #2c1a0c !important;
 }
 
+/* Locked answers (after submitting) read clearly as inert. */
+.opt-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
 /* ==========================================================================
    5. END GAME SCREENS
    ========================================================================== */
@@ -961,6 +969,13 @@ select:focus {
 #tower-upgrade-menu .upg-opt-btn .upg-opt-cost {
     font-size: 10px;
     color: var(--neon-gold);
+}
+#tower-upgrade-menu .upg-opt-btn:not(:disabled) {
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.45);
+}
+#tower-upgrade-menu .upg-opt-btn:not(:disabled):hover {
+    filter: brightness(1.15);
+    box-shadow: 0 0 12px rgba(39, 174, 96, 0.7);
 }
 #tower-upgrade-menu .upg-opt-btn:disabled {
     opacity: 0.45;

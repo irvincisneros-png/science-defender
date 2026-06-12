@@ -236,6 +236,12 @@ class Game {
         this.itemCooldowns = {};       // item key -> frames of cooldown remaining
         this.isTargetingItem = false;  // aiming a targeted item (meteor/bomb/merc)
         this.activeItemKey = null;
+
+        // Screen shake (big impacts: leaks, meteors, boss kills). Frame-based
+        // so it scales with game speed like every other timer.
+        this.shakeFrames = 0;
+        this.shakeDuration = 1;
+        this.shakeMag = 0;
         this._cryoUntil = 0;           // performance.now() ts until which the cryo freeze overlay shows
         this._itemBarBuilt = false;
         this.ideaBubbles = [];
@@ -921,8 +927,19 @@ class Game {
         this.recordBestiaryEncounter(type);
     }
 
+    // Request a screen shake; concurrent requests keep the strongest.
+    addShake(mag, frames) {
+        if (mag >= this.shakeMag || this.shakeFrames <= 0) {
+            this.shakeMag = mag;
+            this.shakeFrames = frames;
+            this.shakeDuration = frames;
+        }
+    }
+
     update() {
         if (this.gameState !== "playing" || this.isPaused) return;
+
+        if (this.shakeFrames > 0) this.shakeFrames--;
 
         // Battle-item cooldowns tick down (frame-based, so 2× speed scales it).
         for (const k in this.itemCooldowns) {
@@ -1030,8 +1047,9 @@ class Game {
                 this.lives -= loss;
                 this.particleSystem.addFloatingText(e.x, e.y, `-${loss} Lives`, "#ff2222", loss > 1 ? 20 : 16);
                 this.particleSystem.createExplosion(e.x, e.y, "#ff2222", 10, 2);
-                // The base takes the hit: flash + impact burst at the base.
+                // The base takes the hit: flash + impact burst + screen shake.
                 this.baseHitAt = performance.now();
+                this.addShake(loss > 1 ? 9 : 4, loss > 1 ? 26 : 14);
                 if (window.audioManager) window.audioManager.playSfx("base_hit");
                 const bp = this.level && this.level._basePoint;
                 if (bp) this.particleSystem.createExplosion(bp.x, bp.y, "#ff5522", 14, 3);
@@ -1043,6 +1061,7 @@ class Game {
             } 
             else if (e.isDead) {
                 if (window.audioManager) window.audioManager.playSfx(`enemy_${e.spriteKey}_death`);
+                if (e.isBoss) this.addShake(8, 24); // boss kills land with weight
                 // Earn gold and RP
                 this.gold += e.goldReward;
                 this.researchPoints += Math.round(e.rpReward * this.rpMult);
@@ -1100,15 +1119,28 @@ class Game {
         this.ctx.msImageSmoothingEnabled = true;
 
         if (this.gameState === "playing") {
+            // Screen shake: jitter the whole scene; decays linearly. The
+            // background is drawn slightly oversized while shaking so canvas
+            // edges never show through.
+            const shaking = this.shakeFrames > 0 && this.shakeMag > 0;
+            let shakePad = 0;
+            if (shaking) {
+                const k = this.shakeFrames / this.shakeDuration;
+                const mag = this.shakeMag * k;
+                shakePad = Math.ceil(this.shakeMag) + 2;
+                this.ctx.save();
+                this.ctx.translate((Math.random() * 2 - 1) * mag, (Math.random() * 2 - 1) * mag);
+            }
+
             // Draw background biome texture. Prefer the painted per-level terrain
             // image (assets/levels/<theme>.png); if it isn't present yet, fall back
             // to the procedural bgColor wash + vector scenery so partial art is safe.
             const bgImg = window.spriteAssets ? window.spriteAssets[`bg_level_${this.level.id}`] : null;
             if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-                this.ctx.drawImage(bgImg, 0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.ctx.drawImage(bgImg, -shakePad, -shakePad, GAME_WIDTH + shakePad * 2, GAME_HEIGHT + shakePad * 2);
             } else {
                 this.ctx.fillStyle = this.level.bgColor;
-                this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                this.ctx.fillRect(-shakePad, -shakePad, GAME_WIDTH + shakePad * 2, GAME_HEIGHT + shakePad * 2);
                 // Draw level scenery background layers
                 LevelManager.drawScenery(this.ctx, this.level);
             }
@@ -1183,12 +1215,16 @@ class Game {
             this.renderBattleItems();
 
             // Cryo Field freeze overlay — frosty vignette while active.
+            // (Gradient is screen-static, so build it once and reuse.)
             if (performance.now() < this._cryoUntil) {
+                if (!this._cryoGrad) {
+                    const g = this.ctx.createRadialGradient(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.25, GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.75);
+                    g.addColorStop(0, "rgba(150,225,255,0.04)");
+                    g.addColorStop(1, "rgba(120,210,255,0.28)");
+                    this._cryoGrad = g;
+                }
                 this.ctx.save();
-                const g = this.ctx.createRadialGradient(GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.25, GAME_WIDTH/2, GAME_HEIGHT/2, GAME_HEIGHT*0.75);
-                g.addColorStop(0, "rgba(150,225,255,0.04)");
-                g.addColorStop(1, "rgba(120,210,255,0.28)");
-                this.ctx.fillStyle = g;
+                this.ctx.fillStyle = this._cryoGrad;
                 this.ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
                 this.ctx.restore();
             }
@@ -1203,10 +1239,13 @@ class Game {
                 this.ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
                 this.ctx.fillStyle = "#3a0d14";
                 this.ctx.fillRect(bx, by, bw, bh);
-                const grad = this.ctx.createLinearGradient(bx, 0, bx + bw, 0);
-                grad.addColorStop(0, "#ff3b5c");
-                grad.addColorStop(1, "#ff8c42");
-                this.ctx.fillStyle = grad;
+                if (!this._bossBarGrad) { // bar geometry is fixed — build once
+                    const grad = this.ctx.createLinearGradient(bx, 0, bx + bw, 0);
+                    grad.addColorStop(0, "#ff3b5c");
+                    grad.addColorStop(1, "#ff8c42");
+                    this._bossBarGrad = grad;
+                }
+                this.ctx.fillStyle = this._bossBarGrad;
                 this.ctx.fillRect(bx, by, bw * ratio, bh);
                 this.ctx.fillStyle = "#fff";
                 this.ctx.font = "bold 12px 'Nunito', sans-serif";
@@ -1381,6 +1420,8 @@ class Game {
                 this.ctx.fillText(label, bx, by + 2);
                 this.ctx.restore();
             }
+
+            if (shaking) this.ctx.restore();
         }
     }
 
@@ -1533,6 +1574,7 @@ class Game {
             }
             if (window.audioManager) window.audioManager.playSfx("hero_curie_skill");
         } else if (key === "meteor" || key === "bomb") {
+            this.addShake(key === "meteor" ? 8 : 4, key === "meteor" ? 22 : 12);
             if (ps) {
                 ps.createExplosion(x, y, def.color, key === "meteor" ? 40 : 22, key === "meteor" ? 6 : 4);
                 ps.createShockwave(x, y, def.radius, def.color, 6, 3);

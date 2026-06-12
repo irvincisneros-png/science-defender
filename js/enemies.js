@@ -96,6 +96,7 @@ class Enemy {
         if (finalDamage >= 1) {
             this.squashX = 1.35; // compress flat
             this.squashY = 0.65;
+            this.hitFlash = 1.0; // white impact flash, decays in update()
             if (window.audioManager) window.audioManager.playSfx("enemy_hit");
         }
 
@@ -129,6 +130,7 @@ class Enemy {
         // Elastic rebound squash and stretch lerp
         this.squashX += (1.0 - this.squashX) * 0.15;
         this.squashY += (1.0 - this.squashY) * 0.15;
+        if (this.hitFlash) this.hitFlash = this.hitFlash > 0.04 ? this.hitFlash * 0.8 : 0;
 
         // Healer trait: periodically restore HP to nearby wounded allies.
         if (this.healer && allEnemies && !this.isDead) {
@@ -207,14 +209,19 @@ class Enemy {
     draw(ctx) {
         ctx.save();
 
+        // Vertical walk bob — paired with the rock-rotation it gives the
+        // hop-along gait; the shadow stays grounded and shrinks at hop apex.
+        const bob = this.isDead ? 0 : Math.abs(Math.sin(this.walkWobble)) * this.size * 0.07;
+        const bobK = 1 - (bob / (this.size * 0.07 || 1)) * 0.18;
+
         // Soft drop shadow
-        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y + this.size * 0.45, this.size * 0.45, this.size * 0.15, 0, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y + this.size * 0.45, this.size * 0.45 * bobK, this.size * 0.15 * bobK, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Apply Squash & Stretch and Walk Wobble
-        ctx.translate(this.x, this.y);
+        ctx.translate(this.x, this.y - bob);
         ctx.scale(this.squashX, this.squashY);
 
         // Slight rocking rotation during movement
@@ -233,6 +240,20 @@ class Enemy {
             ctx.strokeStyle = "#1b1424";
             ctx.lineWidth = 2.5;
             this.drawCartoonVector(ctx);
+        }
+
+        // White impact flash over the sprite on real hits (set in takeDamage).
+        if (this.hitFlash > 0.05) {
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = this.hitFlash * 0.45;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = this.hitFlash * 0.35;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.34, 0, Math.PI * 2);
+            ctx.fill();
         }
 
         ctx.restore();

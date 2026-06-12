@@ -1034,23 +1034,77 @@ class LevelManager {
     static drawPath(ctx, path, pathColor, accentColor) {
         if (!path || path.length < 2) return;
 
+        // The road is fully static per level, so render it once to an
+        // offscreen canvas (keyed by the level's waypoint array — startLevel
+        // deep-clones it, so each run gets a fresh key) and blit every frame.
+        // This both saves per-frame stroke work and makes richer layering free.
+        if (!LevelManager._pathCache) LevelManager._pathCache = new WeakMap();
+        let cached = LevelManager._pathCache.get(path);
+        const w = ctx.canvas ? ctx.canvas.width : 0;
+        const h = ctx.canvas ? ctx.canvas.height : 0;
+        const canCache = w > 0 && typeof document !== "undefined" && !!document.createElement;
+
+        if (!cached && canCache) {
+            const off = document.createElement("canvas");
+            off.width = w; off.height = h;
+            const c = off.getContext("2d");
+            if (c && c.beginPath) {
+                LevelManager._renderPathLayers(c, path, pathColor, accentColor);
+                LevelManager._pathCache.set(path, off);
+                cached = off;
+            }
+        }
+
+        if (cached) {
+            ctx.drawImage(cached, 0, 0);
+        } else {
+            LevelManager._renderPathLayers(ctx, path, pathColor, accentColor);
+        }
+    }
+
+    // Layered road paint: dark edging → packed-earth body → worn centre →
+    // soft inner sheen → dashed accent line. Drawn once into the path cache.
+    static _renderPathLayers(ctx, path, pathColor, accentColor) {
         ctx.save();
-        ctx.strokeStyle = pathColor;
-        ctx.lineWidth = 36;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.beginPath();
-        path.forEach((wp, index) => {
-            if (index === 0) ctx.moveTo(wp.x, wp.y);
-            else ctx.lineTo(wp.x, wp.y);
-        });
+        const trace = () => {
+            ctx.beginPath();
+            path.forEach((wp, index) => {
+                if (index === 0) ctx.moveTo(wp.x, wp.y);
+                else ctx.lineTo(wp.x, wp.y);
+            });
+        };
+        trace();
+
+        // dark outer edging grounds the road against the painted background
+        ctx.strokeStyle = "rgba(12, 8, 20, 0.55)";
+        ctx.lineWidth = 42;
         ctx.stroke();
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+        // main packed-earth body
+        ctx.strokeStyle = pathColor;
+        ctx.lineWidth = 36;
+        ctx.stroke();
+
+        // worn centre track, slightly lighter
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+        ctx.lineWidth = 22;
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
         ctx.lineWidth = 32;
         ctx.stroke();
 
-        ctx.strokeStyle = accentColor + "22";
+        // cobble texture: short accent ticks along the road
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
+        ctx.lineWidth = 30;
+        ctx.setLineDash([2, 26]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // centre accent dashes (the original guide line, slightly brighter)
+        ctx.strokeStyle = accentColor + "33";
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 12]);
         ctx.stroke();

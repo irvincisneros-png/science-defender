@@ -1,6 +1,34 @@
 // js/particles.js
 // 2D Cartoon Fantasy Particles and Effects (Kingdom Rush style) with circular blooms, spark bursts, and bubble vapor clouds
 
+// Pre-rendered glow sprites, one per particle colour. Creating a radial
+// gradient per particle per frame (40+ during big explosions) thrashes the
+// rasteriser; instead each colour is rendered once to a small offscreen
+// canvas and blitted scaled. Cache is capped in case of many dynamic colours.
+const _GLOW_SIZE = 64;
+const _glowCache = new Map();
+function _glowSprite(color) {
+    let c = _glowCache.get(color);
+    if (c) return c;
+    if (typeof document === "undefined" || !document.createElement) return null;
+    if (_glowCache.size > 160) _glowCache.clear();
+    c = document.createElement("canvas");
+    c.width = c.height = _GLOW_SIZE;
+    const g = c.getContext("2d");
+    if (!g || !g.createRadialGradient) return null; // headless test stub
+    const half = _GLOW_SIZE / 2;
+    const grad = g.createRadialGradient(half, half, 1, half, half, half);
+    grad.addColorStop(0, "#ffffff");
+    grad.addColorStop(0.3, color);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(half, half, half, 0, Math.PI * 2);
+    g.fill();
+    _glowCache.set(color, c);
+    return c;
+}
+
 class Particle {
     constructor(x, y, vx, vy, color, size, life, fadeSpeed, gravity = 0, drag = 0.96) {
         this.x = x;
@@ -28,17 +56,22 @@ class Particle {
     draw(ctx) {
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.life);
-        
-        // Shiny 2D cartoon radial glowing circles
-        const bubbleGrad = ctx.createRadialGradient(this.x, this.y, 1, this.x, this.y, this.size);
-        bubbleGrad.addColorStop(0, "#ffffff");
-        bubbleGrad.addColorStop(0.3, this.color);
-        bubbleGrad.addColorStop(1, "transparent");
-        
-        ctx.fillStyle = bubbleGrad;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+
+        // Shiny 2D cartoon radial glow — blitted from the per-colour sprite
+        // cache instead of building a gradient per particle per frame.
+        const sprite = _glowSprite(this.color);
+        if (sprite) {
+            ctx.drawImage(sprite, this.x - this.size, this.y - this.size, this.size * 2, this.size * 2);
+        } else {
+            const bubbleGrad = ctx.createRadialGradient(this.x, this.y, 1, this.x, this.y, this.size);
+            bubbleGrad.addColorStop(0, "#ffffff");
+            bubbleGrad.addColorStop(0.3, this.color);
+            bubbleGrad.addColorStop(1, "transparent");
+            ctx.fillStyle = bubbleGrad;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
         ctx.restore();
     }
 }
@@ -66,9 +99,13 @@ class FloatingText {
     draw(ctx) {
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.life);
-        
+
+        // Pop-in: numbers land oversized then settle, so hits read instantly.
+        const age = 1 - this.life;                    // 0 at spawn → 1 at fade
+        const pop = 1 + Math.max(0, 1 - age * 8) * 0.6;
+
         // Beautiful bubbly Fredoka font for cartoon metrics
-        ctx.font = `bold ${this.size}px 'Fredoka', sans-serif`;
+        ctx.font = `bold ${Math.round(this.size * pop)}px 'Fredoka', sans-serif`;
         ctx.textAlign = "center";
         
         // Thick dark storybook border
@@ -229,7 +266,8 @@ class ParticleSystem {
             const size = 12 + Math.random() * 12;
             const life = 0.8 + Math.random() * 0.2;
             const fade = 0.012 + Math.random() * 0.01;
-            const color = `hsla(${100 + Math.random() * 40}, 80%, 45%, 0.35)`;
+            // Hue quantized to 8° steps so the glow-sprite cache stays small.
+            const color = `hsla(${100 + Math.round(Math.random() * 5) * 8}, 80%, 45%, 0.35)`;
             
             this.particles.push(new Particle(px, py, vx, vy, color, size, life, fade, 0, 0.99));
         }
@@ -249,7 +287,7 @@ class ParticleSystem {
             const size = 5 + Math.random() * 5;
             const life = 0.5;
             const fade = 0.035;
-            const color = `hsla(${270 + Math.random() * 40}, 95%, 55%, 0.85)`;
+            const color = `hsla(${270 + Math.round(Math.random() * 5) * 8}, 95%, 55%, 0.85)`;
             this.particles.push(new Particle(px, py, vx, vy, color, size, life, fade, 0, 0.97));
         }
     }

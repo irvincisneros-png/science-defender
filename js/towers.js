@@ -17,7 +17,10 @@ class Projectile {
         this.totalDist = 0;
         this.calcDistToTarget();
         this.spinAngle = 0;
+        this.trail = []; // recent positions, drawn as a fading streak
     }
+
+    static TRAIL_COLORS = { spore: "#00ff66", flask: "#ff9900", bullet: "#00ffff", gravity: "#bf55ec" };
 
     calcDistToTarget() {
         if (!this.target) return;
@@ -58,6 +61,8 @@ class Projectile {
             return false;
         }
 
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > 5) this.trail.shift();
         this.x += (dx / dist) * this.speed;
         this.y += (dy / dist) * this.speed;
         this.spinAngle += 0.18;
@@ -152,6 +157,23 @@ class Projectile {
     }
 
     draw(ctx) {
+        // Fading motion streak behind the projectile.
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = Projectile.TRAIL_COLORS[this.type] || "#ffffff";
+            ctx.lineCap = "round";
+            for (let i = 1; i < this.trail.length; i++) {
+                const k = i / this.trail.length;
+                ctx.globalAlpha = k * 0.35;
+                ctx.lineWidth = 1 + k * 3.5;
+                ctx.beginPath();
+                ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+                ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.spinAngle);
@@ -404,7 +426,9 @@ class Tower {
                 this.fire(targets, projectiles, particleSystem, enemies);
                 if (window.audioManager) window.audioManager.playSfx(`tower_${this.type}_fire`);
                 this.cooldownTimer = this.cooldown;
-                this._lastFireTime = performance.now(); // trigger attack animation
+                this._lastFireTime = performance.now(); // trigger attack animation + recoil pop
+                // Muzzle flash: a small burst in the tower's colour at the emitter.
+                if (particleSystem) particleSystem.createExplosion(this.x, this.y - 14, this.color, 4, 1.8);
             }
         }
     }
@@ -501,6 +525,16 @@ class Tower {
         ctx.arc(this.x, this.y + 16, 18, 0, Math.PI * 2);
         ctx.fill();
 
+        // Idle breathing + a quick recoil pop on fire, applied around the
+        // sprite/vector body only (shadow and range ring stay put).
+        const _now = performance.now();
+        const recoil = this._lastFireTime ? Math.max(0, 1 - (_now - this._lastFireTime) / 160) : 0;
+        const liveScale = 1 + Math.sin(_now / 700 + this.x * 0.13) * 0.012 + recoil * 0.07;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(liveScale, liveScale);
+        ctx.translate(-this.x, -this.y);
+
         // Animated sprite sheet (idle/attack); falls back to vector cartoon.
         const sprLvlKey = this.level === 4 ? "4" : this.level === 3 ? "3" : "1";
         const baseKey = `tower_${this.type}_${sprLvlKey}`;
@@ -517,6 +551,7 @@ class Tower {
             ctx.lineWidth = 2.5;
             this.drawCartoonVector(ctx);
         }
+        ctx.restore();
 
         // Star indicator tags
         ctx.save();
@@ -1266,7 +1301,9 @@ class VolcanoTower extends Tower {
                 this.fire(targets, projectiles, particleSystem, enemies);
                 if (window.audioManager) window.audioManager.playSfx(`tower_${this.type}_fire`);
                 this.cooldownTimer = this.cooldown;
-                this._lastFireTime = performance.now(); // trigger attack animation
+                this._lastFireTime = performance.now(); // trigger attack animation + recoil pop
+                // Muzzle flash: a small burst in the tower's colour at the emitter.
+                if (particleSystem) particleSystem.createExplosion(this.x, this.y - 14, this.color, 4, 1.8);
             }
         }
 
