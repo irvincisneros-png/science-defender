@@ -5,6 +5,20 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-06-12 — Remove 26 dead asset-manifest entries (misleading "sprite not found" warnings)
+
+The full sprite set (14 hero sheets, 24 tower sheets, 22 enemy walk strips, 20 level paintings —
+81 assets) was generated on 2026-06-02 and **loads and renders fine**. But `ASSETS_MANIFEST`
+still listed the old pre-animation STATIC image keys (`hero_einstein` → `einstein.png`,
+`tower_physics_1` → `physics_1.png`, 7 enemy statics, 2 projectile statics) whose files were
+never produced — superseded by the animated strips. Every page load therefore fired 26 404s and
+26 "PNG Sprite not found → falling back to procedural" warnings, which made it look like the art
+pipeline was broken when it wasn't (and "All PNG assets successfully loaded!" could never fire).
+Removed the dead entries (`game.js`); `drawSprite`'s static-image fallback tier still works if a
+plain `baseKey` asset is ever added. Projectiles remain intentionally vector-drawn (now with
+trails). **Verified:** suite 57/57; reload shows 81/81 assets loaded, the success log, zero
+warnings.
+
 ## 2026-06-12 — Visual polish pass: combat juice + rendering performance
 
 Realm-Defense-style "juice" (all procedural canvas/CSS, no new art assets — entity PNGs remain

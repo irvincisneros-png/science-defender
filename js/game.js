@@ -17,46 +17,17 @@ const BATTLE_ITEMS = [
 const BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS.reduce((m, it) => { m[it.key] = it; return m; }, {});
 if (typeof window !== "undefined") { window.BATTLE_ITEMS = BATTLE_ITEMS; window.BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS_BY_KEY; }
 
+// NOTE: the old per-entity STATIC image entries (hero_einstein → einstein.png,
+// tower_physics_1 → physics_1.png, enemy_* → <key>.png, proj_*) were removed —
+// those files were never produced; the delivered art is the animated strips
+// registered in buildSheetMeta() below. Keeping the dead entries meant a 404 +
+// a scary "falling back to procedural" warning per key on every load, even
+// though every entity actually renders from its strip. drawSprite's static-
+// image fallback tier still works if a plain `baseKey` asset is ever added.
+// Projectiles are intentionally vector-drawn (with motion trails).
 const ASSETS_MANIFEST = {
     // UI/Backgrounds
     "bg_menu": "assets/ui/fantasy_bg.png",
-    
-    // Heroes
-    "hero_einstein": "assets/heroes/einstein.png",
-    "hero_newton": "assets/heroes/newton.png",
-    "hero_curie": "assets/heroes/curie.png",
-    "hero_darwin": "assets/heroes/darwin.png",
-    "hero_tortoise": "assets/heroes/tortoise.png",
-    
-    // Towers
-    "tower_physics_1": "assets/towers/physics_1.png",
-    "tower_physics_3": "assets/towers/physics_3.png",
-    "tower_physics_4": "assets/towers/physics_4.png",
-    
-    "tower_chemistry_1": "assets/towers/chemistry_1.png",
-    "tower_chemistry_3": "assets/towers/chemistry_3.png",
-    "tower_chemistry_4": "assets/towers/chemistry_4.png",
-    
-    "tower_biology_1": "assets/towers/biology_1.png",
-    "tower_biology_3": "assets/towers/biology_3.png",
-    "tower_biology_4": "assets/towers/biology_4.png",
-    
-    "tower_astronomy_1": "assets/towers/astronomy_1.png",
-    "tower_astronomy_3": "assets/towers/astronomy_3.png",
-    "tower_astronomy_4": "assets/towers/astronomy_4.png",
-    
-    // Enemies
-    "enemy_flatearth": "assets/enemies/flatearth.png",
-    "enemy_phlogiston": "assets/enemies/phlogiston.png",
-    "enemy_spontaneous": "assets/enemies/spontaneous.png",
-    "enemy_maggot": "assets/enemies/maggot.png",
-    "enemy_alchemy": "assets/enemies/alchemy.png",
-    "enemy_perpetual": "assets/enemies/perpetual.png",
-    "enemy_geocentric": "assets/enemies/geocentric.png",
-    
-    // Projectiles
-    "proj_flask": "assets/projectiles/flask.png",
-    "proj_spore": "assets/projectiles/spore.png"
 };
 
 // ---- Animated sprite sheets (single-row strips) -------------------------
