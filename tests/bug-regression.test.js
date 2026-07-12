@@ -559,13 +559,13 @@ check("placement limit caps a tower type at 3 per map", () => {
   if (n !== game.MAX_PER_TYPE) throw new Error(`expected ${game.MAX_PER_TYPE} physics towers (got ${n})`);
 });
 
-// Progressive unlocks: levels 1-3 are restricted; later levels open up.
+// Progressive unlocks: levels 1-3 teach the core counters; later levels open up.
 check("progression: levels 1-3 restricted, later levels unlock all", () => {
   const game = new globalThis.Game();
   game.isEndless = false;
   const early = game.getLevelUnlocks(0);
-  if (early.towers.length !== 2 || early.maxLevel !== 2 || early.spec)
-    throw new Error("levels 1-3 should give 2 towers, max upgrade 2, no specialization");
+  if (early.towers.length !== 3 || !early.towers.includes("chemistry") || early.maxLevel !== 2 || early.spec)
+    throw new Error("levels 1-3 should give the 3 core counter towers, max upgrade 2, no specialization");
   const late = game.getLevelUnlocks(10);
   if (late.towers.length !== 6 || late.maxLevel !== 3 || !late.spec)
     throw new Error("later levels should unlock all 6 towers + specialization");

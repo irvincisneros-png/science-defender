@@ -54,7 +54,7 @@ function expectedCell(assetPath) {
   const name = path.basename(assetPath, ".png");
   if (assetPath.includes("/levels/")) return { width: 1800, height: 1100, exact: true, kind: "level" };
   if (assetPath.includes("/heroes/")) return { width: 64, height: 64, exact: false, kind: "hero strip" };
-  if (assetPath.includes("/towers/")) return { width: 64, height: 64, exact: false, kind: "tower strip" };
+  if (assetPath.includes("/towers/")) return { width: 128, height: 128, exact: false, kind: "tower strip" };
   if (assetPath.includes("/enemies/")) {
     const cell = name.startsWith("boss_") ? 128 : 64;
     return { width: cell, height: cell, exact: false, kind: "enemy strip" };

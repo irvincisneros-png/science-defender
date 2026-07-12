@@ -5,6 +5,23 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-07-12 — Visual overhaul v2: production-scale actors and generated structures
+
+- Replaced all 36 tower progression strips with new Image Gen art for Physics, Biology,
+  Chemistry, Astronomy, Volcano and Field Team, packed at 128px cells for cleaner battlefield rendering.
+- Replaced the provisional neon spawn/base shapes with generated Misconception Rift and Empirical Core
+  structures, and rebuilt build pads plus foreground occluders as grounded brass/stone scenery.
+- Enlarged and foot-anchored heroes, enemies and towers; added framed actor badges, stronger shadows,
+  real scientist portraits in the command tray, and safer build-pad placement around screen edges/objectives.
+- Rebuilt the splash, campaign atlas, battle sidebar, victory and defeat presentations around a denser
+  brass/enamel/parchment composition with desktop, short-landscape and phone-responsive layouts.
+- Fixed keyboard placement focus and stale placement messaging, made 2× setup countdowns wall-clock honest,
+  and exposed Chemistry in Levels 1–3 so the tutorial roster contains the intended armor counter.
+- Retuned Level 1 onboarding enemy scaling and verified a full 3-star, 20/20-integrity browser playthrough.
+
+**Verified:** 68/68 gameplay checks plus the actor-presentation regression, strict asset audit with
+0 errors/0 warnings, zero-error desktop and 844×390 browser runs, keyboard placement, and full Level 1 victory.
+
 ## 2026-07-12 — Full campaign visual overhaul complete
 
 - Added DPR-aware 900×550 logical rendering, fixed-tick interpolation, foreground occlusion,

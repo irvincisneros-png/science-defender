@@ -22,14 +22,21 @@
              1. MAIN MENU SCREEN
              ========================================== -->
         <div id="screen-menu" class="screen active">
+            <div class="menu-emblem" aria-hidden="true">
+                <span class="emblem-orbit"></span>
+                <span class="emblem-atom">S</span>
+            </div>
             <div class="title-container">
+                <p class="title-kicker">Royal Academy Expedition Corps</p>
                 <h1 class="title-main">Science Defender</h1>
                 <p class="title-sub">The Empirical Defense Initiative</p>
             </div>
             
             <div class="menu-buttons">
+                <p class="menu-callout">The frontier is under siege by history's greatest misconceptions.</p>
                 <button class="menu-btn menu-btn-cyan" onclick="switchScreen('screen-levelselect')">Begin Expedition</button>
                 <button class="menu-btn" onclick="switchScreen('screen-bestiary')">Open Field Notes</button>
+                <p class="menu-footnote">Build • Research • Defend</p>
             </div>
         </div>
 
@@ -38,7 +45,13 @@
              ========================================== -->
         <div id="screen-levelselect" class="screen">
             <div class="topic-selection-bar">
-                <h2>Choose Your Expedition</h2>
+                <div class="campaign-heading">
+                    <span class="campaign-seal" aria-hidden="true">20</span>
+                    <div>
+                        <p class="section-kicker">Campaign Atlas</p>
+                        <h2>Choose Your Expedition</h2>
+                    </div>
+                </div>
                 <div class="dropdown-wrapper">
                     <div>
                         <label for="select-year" style="font-size: 11px; text-transform: uppercase; color: #bdc3c7; display: block; margin-bottom: 4px;">Year Group</label>
@@ -66,9 +79,9 @@
             </div>
 
             <nav class="screen-actions" aria-label="Level selection actions">
-                <button style="padding: 10px 25px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Back to Menu</button>
-                <button style="padding: 10px 25px; background: linear-gradient(135deg, #8e44ad, #6c3fb5); color:#fff;" onclick="switchScreen('screen-meta')">Research Upgrades</button>
-                <button style="padding: 10px 25px; background: linear-gradient(135deg, #f39c12, #e67e22); color:#000;" onclick="launchLevel(0, true)">Launch Endless Mode</button>
+                <button class="secondary-action" onclick="switchScreen('screen-menu')">Back to Menu</button>
+                <button class="research-action" onclick="switchScreen('screen-meta')">Research Upgrades</button>
+                <button class="endless-action" onclick="launchLevel(0, true)">Launch Endless Mode</button>
             </nav>
         </div>
 
@@ -174,7 +187,13 @@
                 </section>
 
                 <section class="hud-tray-section hero-tray" aria-labelledby="heroes-heading">
-                <h2 id="heroes-heading">Expedition Leaders</h2>
+                <div class="hero-tray-heading">
+                    <span class="hero-command-seal" aria-hidden="true">✦</span>
+                    <div>
+                        <h2 id="heroes-heading">Expedition Leaders</h2>
+                        <p>Select a leader to command the field</p>
+                    </div>
+                </div>
                 <div id="hud-hero-skills" class="hud-hero-skills-section">
                     <!-- Filled dynamically in gameInstance.updateSidebarUI() -->
                 </div>
@@ -193,13 +212,20 @@
              4. VICTORY SCREEN
              ========================================== -->
         <div id="screen-victory" class="screen end-screen">
-            <h1 class="victory-title">Scientific Victory!</h1>
-            <div id="victory-details">
-                <!-- details go here -->
+            <div class="end-illustration victory-illustration" aria-hidden="true">
+                <span class="result-rays"></span>
+                <span class="result-medallion">✓</span>
             </div>
-            <div style="margin-top: 30px; display:flex; gap:15px; justify-content:center;">
-                <button style="padding: 12px 30px;" onclick="switchScreen('screen-levelselect')">Continue</button>
-                <button style="padding: 12px 30px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Main Menu</button>
+            <div class="end-panel victory-panel">
+                <p class="end-kicker">Expedition Complete</p>
+                <h1 class="victory-title">Scientific Victory!</h1>
+                <div id="victory-details" class="end-details">
+                    <!-- details go here -->
+                </div>
+                <div class="end-actions">
+                    <button onclick="switchScreen('screen-levelselect')">Continue Campaign</button>
+                    <button class="secondary-action" onclick="switchScreen('screen-menu')">Main Menu</button>
+                </div>
             </div>
         </div>
 
@@ -207,13 +233,21 @@
              5. DEFEAT SCREEN
              ========================================== -->
         <div id="screen-defeat" class="screen end-screen">
-            <h1 class="defeat-title">Scientific Fallacy!</h1>
-            <div id="defeat-details">
-                <!-- details go here -->
+            <div class="end-illustration defeat-illustration" aria-hidden="true">
+                <span class="result-crack"></span>
+                <span class="result-medallion">!</span>
             </div>
-            <div style="margin-top: 30px; display:flex; gap:15px; justify-content:center;">
-                <button style="padding: 12px 30px;" onclick="switchScreen('screen-levelselect')">Try Again</button>
-                <button style="padding: 12px 30px; background: rgba(255,255,255,0.05);" onclick="switchScreen('screen-menu')">Main Menu</button>
+            <div class="end-panel defeat-panel">
+                <p class="end-kicker">Perimeter Breached</p>
+                <h1 class="defeat-title">Scientific Fallacy!</h1>
+                <div id="defeat-details" class="end-details">
+                    <!-- details go here -->
+                </div>
+                <p class="retry-tip">Review the enemy field notes, reposition your leaders, and return stronger.</p>
+                <div class="end-actions">
+                    <button onclick="switchScreen('screen-levelselect')">Retry Expedition</button>
+                    <button class="secondary-action" onclick="switchScreen('screen-menu')">Main Menu</button>
+                </div>
             </div>
         </div>
 
@@ -414,6 +448,9 @@
                 const firstPad = (game.level && game.level.buildSpots || []).find(p => !p.occupied);
                 if (firstPad) { game.mouseX = firstPad.x; game.mouseY = firstPad.y; }
                 game.showInGameNotification(`Placement armed: tap a glowing pad, or focus the battlefield and use arrow keys then Enter.`);
+                if (game.canvas && game.canvas.focus) {
+                    requestAnimationFrame(() => game.canvas.focus({ preventScroll: true }));
+                }
             }
         }
 

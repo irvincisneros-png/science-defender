@@ -27,7 +27,8 @@ Built with vanilla **HTML5 / CSS / JavaScript** — no build step, no dependenci
 - **Modern renderer:** fixed 60 Hz simulation with interpolated DPR canvas rendering, staged
   selected-level art, foreground occlusion, reduced-motion support, and keyboard build-pad placement.
 - **Illustrated expedition art:** a complete production roster of 17 regular enemies and 5 bosses,
-  plus Volcano, Field Team station, blocker troops, and an original outlined HUD icon family.
+  generated 128px progression art for all 6 tower families, illustrated battlefield objectives,
+  enlarged scientist heroes, blocker troops, and an original outlined HUD icon family.
 
 ## Run locally
 
@@ -53,7 +54,7 @@ node tests/bug-regression.test.js
 node tests/tooling-validation.test.js
 ```
 
-The current regression baseline is **68/68**. Tooling validation also runs regular and boss sprite QA and a
+The current regression baseline is **69 checks** (68 gameplay plus actor-presentation coverage). Tooling validation also runs regular and boss sprite QA and a
 20-level route/pad coverage report.
 
 Asset integrity, sprite-sheet dimensions, payload size, duplicate content, and literal runtime

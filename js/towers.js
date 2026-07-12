@@ -276,7 +276,12 @@ class Tower {
         this.level = 1;
         this.targetMode = "first";
         this.isHovered = false;
-        this.size = 64; // Cartoon tower bounding box width/height (matches 64px sprite cell)
+        // Visual footprint only: targeting and range continue to use x/y and
+        // `range`. The delivered 64px cells contain heavy transparent gutters,
+        // so a 96px destination is needed for structures to command the pad.
+        this.size = 96;
+        this.groundOffset = 20;
+        this.spriteFootRatio = 58 / 64;
 
         this.canHitAir = true;       // subclasses set false for ground-only towers
         this.damageType = "physical"; // 'physical' | 'energy' | 'acid' | 'magic'
@@ -500,9 +505,13 @@ class Tower {
         }
 
         // Soft drop shadow
-        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.fillStyle = "rgba(8, 5, 12, 0.36)";
         ctx.beginPath();
-        ctx.arc(this.x, this.y + 16, 18, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y + this.groundOffset + 2, 30, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y + this.groundOffset + 2, 18, 6, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Idle breathing + a quick recoil pop on fire, applied around the
@@ -524,29 +533,22 @@ class Tower {
             const durMs = (atkMeta.cols / atkMeta.fps) * 1000;
             if (performance.now() - this._lastFireTime < durMs) towerState = "attack";
         }
+        const spriteY = this.y + this.groundOffset - this.size * this.spriteFootRatio;
         if (!window.drawSprite(ctx, baseKey, towerState,
-                this.x - this.size/2, this.y - this.size/2, this.size, this.size, this._lastFireTime)) {
+                this.x - this.size/2, spriteY, this.size, this.size, this._lastFireTime)) {
             // High fidelity vector cartoon drawing fallbacks
             ctx.strokeStyle = "#1b1424";
             ctx.lineWidth = 2.5;
+            ctx.save();
+            ctx.translate(this.x, this.y + 10);
+            ctx.scale(1.18, 1.18);
+            ctx.translate(-this.x, -(this.y + 10));
             this.drawCartoonVector(ctx);
+            ctx.restore();
         }
         ctx.restore();
 
-        // Star indicator tags
-        ctx.save();
-        ctx.fillStyle = "#ffcc00";
-        ctx.strokeStyle = "#2c1a0c";
-        ctx.lineWidth = 1.5;
-        ctx.font = "bold 13px 'Fredoka', sans-serif";
-        ctx.textAlign = "center";
-
-        let label = "★".repeat(this.level);
-        if (this.level === 4) label = "Ω Ultimate";
-
-        ctx.strokeText(label, this.x, this.y - 26);
-        ctx.fillText(label, this.x, this.y - 26);
-        ctx.restore();
+        _drawTowerLevelBadge(ctx, this.x, this.y - 68, this.level, this.color);
 
         ctx.restore();
     }
@@ -584,6 +586,24 @@ function _drawLevelRings(ctx, x, y, level, color) {
         ctx.stroke();
         ctx.restore();
     }
+}
+
+// Compact badge used by every production tower. It stays legible over bright
+// maps and avoids the oversized "★★★★" / "Ω Ultimate" strings colliding with
+// the enlarged structure art.
+function _drawTowerLevelBadge(ctx, x, y, level, color) {
+    ctx.save();
+    const ultimate = level === 4;
+    const label = ultimate ? "Ω  ULT" : `★  LV ${level}`;
+    const width = ultimate ? 48 : 44;
+    drawRoundedRect(ctx, x - width / 2, y - 9, width, 18, 7,
+        "rgba(20, 14, 24, 0.88)", ultimate ? "#ffd45a" : color, 1.5);
+    ctx.fillStyle = ultimate ? "#ffd45a" : "#fff4bd";
+    ctx.font = "bold 10px 'Fredoka', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, x, y + 0.5);
+    ctx.restore();
 }
 
 // ─── HELPER: draw a specialization glow halo ─────────────────────────────────
@@ -1726,9 +1746,9 @@ class BarracksTower extends Tower {
 
         // Drop shadow
         ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillStyle = "rgba(8,5,12,0.36)";
         ctx.beginPath();
-        ctx.arc(this.x, this.y + 16, 20, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y + this.groundOffset + 2, 32, 12, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
@@ -1737,23 +1757,18 @@ class BarracksTower extends Tower {
         ctx.strokeStyle = "#1b1424";
         ctx.lineWidth = 2.5;
         const tier = this.level === 4 ? "4" : this.level === 3 ? "3" : "1";
+        const spriteY = this.y + this.groundOffset - this.size * this.spriteFootRatio;
         if (!window.drawSprite(ctx, `tower_barracks_${tier}`, "idle",
-                this.x - this.size/2, this.y - this.size/2, this.size, this.size, 0)) {
+                this.x - this.size/2, spriteY, this.size, this.size, 0)) {
+            ctx.save();
+            ctx.translate(this.x, this.y + 10);
+            ctx.scale(1.18, 1.18);
+            ctx.translate(-this.x, -(this.y + 10));
             this.drawCartoonVector(ctx);
+            ctx.restore();
         }
 
-        // Star label
-        ctx.save();
-        ctx.fillStyle = "#ffcc00";
-        ctx.strokeStyle = "#2c1a0c";
-        ctx.lineWidth = 1.5;
-        ctx.font = "bold 13px 'Fredoka', sans-serif";
-        ctx.textAlign = "center";
-        let label = "★".repeat(Math.min(this.level, 3));
-        if (this.level === 4) label = "Ω Ultimate";
-        ctx.strokeText(label, this.x, this.y - 30);
-        ctx.fillText(label, this.x, this.y - 30);
-        ctx.restore();
+        _drawTowerLevelBadge(ctx, this.x, this.y - 68, this.level, this.color);
 
         ctx.restore();
     }

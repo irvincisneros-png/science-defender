@@ -194,7 +194,13 @@ class Hero {
         this.blockLimit = 1;
 
         this.level = 1;
-        this.size = 54;
+        // Presentation dimensions are deliberately independent from movement,
+        // blocking and attack range. The source sheets are 64px cells whose
+        // opaque art occupies only ~35-56px horizontally; a 54px destination
+        // therefore made the scientists read as enemy-sized stickers.
+        this.size = 96;
+        this.groundOffset = 18;
+        this.spriteFootRatio = 58 / 64;
         this.isMoving = false;
 
         // Gap 2: in-level XP / leveling (1 → 5, scales damage + maxHealth).
@@ -439,7 +445,7 @@ class Hero {
             ctx.shadowBlur = 8;
             ctx.shadowColor = this.color;
             ctx.beginPath();
-            ctx.ellipse(this.x, this.y + 10, 18, 7, 0, 0, Math.PI * 2);
+            ctx.ellipse(this.x, this.y + this.groundOffset, 27, 9, 0, 0, Math.PI * 2);
             ctx.stroke();
             
             ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
@@ -449,9 +455,13 @@ class Hero {
         }
 
         // Soft drop shadow
-        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.fillStyle = "rgba(8, 5, 15, 0.34)";
         ctx.beginPath();
-        ctx.ellipse(this.x, this.y + 11, 12, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y + this.groundOffset + 1, 23, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y + this.groundOffset + 1, 13, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // 2D Cartoon walk bob cycle (vector fallback only — animated sheets
@@ -465,7 +475,11 @@ class Hero {
         const baseKey = `hero_${this.spriteKey}`;
         const state = this.getAnimState();
         const dw = this.size, dh = this.size;
-        const dx = this.x - dw / 2, dy = this.y - dh / 2;
+        const dx = this.x - dw / 2;
+        // All production hero sheets share a bottom opaque pixel at y=57.
+        // Pin that foot line to the gameplay ground point instead of centering
+        // the transparent 64px cell around it.
+        const dy = this.y + this.groundOffset - dh * this.spriteFootRatio;
         let drawn;
         if (this.faceLeft) {
             ctx.save();
@@ -484,38 +498,49 @@ class Hero {
             ctx.lineWidth = 2.5;
 
             ctx.save();
-            ctx.translate(0, bobY);
+            ctx.translate(this.x, this.y + 8 + bobY);
+            ctx.scale(1.35, 1.35);
+            ctx.translate(-this.x, -(this.y + 8));
             this.drawCartoonVector(ctx);
             ctx.restore();
         }
 
-        // Draw HP bar
-        if (this.health < this.maxHealth) {
-            const ratio = this.health / this.maxHealth;
-            ctx.fillStyle = "rgba(0,0,0,0.6)";
-            ctx.fillRect(this.x - 15, this.y - 28, 30, 4);
-            ctx.fillStyle = "rgba(0, 255, 100, 0.95)";
-            ctx.fillRect(this.x - 15, this.y - 28, 30 * ratio, 4);
-        }
+        // A single framed status plate keeps HP, XP and level readable against
+        // detailed maps. HP remains visible at full health so hero identity and
+        // survivability never disappear during quiet moments.
+        const plateX = this.x - 27;
+        const plateY = this.y - 70;
+        const healthRatio = Math.max(0, Math.min(1, this.health / this.maxHealth));
+        ctx.fillStyle = "rgba(15, 12, 24, 0.82)";
+        drawRoundedRect(ctx, plateX, plateY, 54, 12, 5, "rgba(15, 12, 24, 0.82)", "rgba(255,255,255,0.26)", 1);
+        ctx.fillStyle = healthRatio > 0.35 ? "#42e887" : "#ff5d68";
+        ctx.fillRect(plateX + 3, plateY + 3, 48 * healthRatio, 4);
 
-        // Gap 2: slim purple XP bar beneath the HP bar + level badge.
+        // Slim purple XP track beneath HP.
         if (this.level < this.maxLevel) {
             const xpRatio = Math.max(0, Math.min(1, this.xp / this.xpNeeded));
-            ctx.fillStyle = "rgba(0,0,0,0.5)";
-            ctx.fillRect(this.x - 15, this.y - 23, 30, 3);
+            ctx.fillStyle = "rgba(0,0,0,0.55)";
+            ctx.fillRect(plateX + 3, plateY + 8, 48, 2);
             ctx.fillStyle = "rgba(170, 90, 255, 0.95)";
-            ctx.fillRect(this.x - 15, this.y - 23, 30 * xpRatio, 3);
+            ctx.fillRect(plateX + 3, plateY + 8, 48 * xpRatio, 2);
         }
-        // Level badge + a glow ring at higher levels.
-        ctx.fillStyle = this.level >= this.maxLevel ? "#ffd700" : "#c9b6ff";
+        // Level medallion + a glow ring at higher levels.
+        ctx.beginPath();
+        ctx.fillStyle = this.level >= this.maxLevel ? "#ffd45a" : "#7957c8";
+        ctx.arc(this.x + 30, plateY + 6, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.72)";
+        ctx.lineWidth = 1.25;
+        ctx.stroke();
+        ctx.fillStyle = this.level >= this.maxLevel ? "#332000" : "#ffffff";
         ctx.font = "bold 9px sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`L${this.level}`, this.x + 16, this.y - 22);
+        ctx.textAlign = "center";
+        ctx.fillText(`${this.level}`, this.x + 30, plateY + 9);
         if (this.level >= 3) {
             ctx.strokeStyle = this.level >= this.maxLevel ? "rgba(255,215,0,0.55)" : "rgba(170,90,255,0.45)";
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(this.x, this.y + 8, 16, 0, Math.PI * 2);
+            ctx.ellipse(this.x, this.y + this.groundOffset, 25, 9, 0, 0, Math.PI * 2);
             ctx.stroke();
         }
 
