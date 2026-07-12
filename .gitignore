@@ -11,3 +11,15 @@ _rejected_level_art/
 # Node (defensive — project has no build step)
 node_modules/
 *.log
+
+# Local browser QA artifacts and CLI session state
+output/
+.playwright/
+.playwright-cli/
+
+# Local high-resolution Image Gen/chroma-key working sources
+tmp/
+
+# Python helper caches
+__pycache__/
+*.py[cod]

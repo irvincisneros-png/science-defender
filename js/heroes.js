@@ -101,8 +101,11 @@ class SummonedMinion {
         ctx.arc(this.x, this.y + 8, this.size * 0.45, 0, Math.PI * 2);
         ctx.fill();
 
-        // Animated idle sheet (falls back to the vector tortoise).
-        if (!window.drawSprite(ctx, "hero_tortoise", "idle",
+        // Field Team blockers use their expedition troop walk strip; Darwin's
+        // summon retains the tortoise idle art.
+        const spriteBase = this.spriteBase || "hero_tortoise";
+        const spriteState = this.spriteBase ? "walk" : "idle";
+        if (!window.drawSprite(ctx, spriteBase, spriteState,
                 this.x - this.size/2, this.y - this.size/2, this.size, this.size, 0)) {
             // 2D Cartoon Vector Galapagos Tortoise
             ctx.strokeStyle = "#2c1a0c";

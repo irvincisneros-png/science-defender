@@ -5,17 +5,18 @@
 // style). `targeted` items are aimed on the battlefield; others fire instantly.
 // Costs/cooldowns are balanced defaults and easy to tune.
 const BATTLE_ITEMS = [
-    { key: "cryo",   name: "Cryo Field",  icon: "❄️", cost: 30, cooldownSec: 25, targeted: false, color: "#7fdfff", freezeSec: 3,
+    { key: "cryo",   name: "Cryo Field",  iconKey: "cryo", cost: 30, cooldownSec: 25, targeted: false, color: "#7fdfff", freezeSec: 3,
       desc: "Freezes every enemy on screen for 3s while your towers keep firing." },
-    { key: "meteor", name: "Meteor",      icon: "☄️", cost: 25, cooldownSec: 16, targeted: true, color: "#ff7b3a", radius: 115, damage: 320,
+    { key: "meteor", name: "Meteor",      iconKey: "meteor", cost: 25, cooldownSec: 16, targeted: true, color: "#ff7b3a", radius: 115, damage: 320,
       desc: "Calls down a meteor for massive true-damage in a large area." },
-    { key: "bomb",   name: "Mini Bomb",   icon: "💣", cost: 12, cooldownSec: 7,  targeted: true, color: "#ffd166", radius: 72,  damage: 130,
+    { key: "bomb",   name: "Mini Bomb",   iconKey: "bomb", cost: 12, cooldownSec: 7,  targeted: true, color: "#ffd166", radius: 72,  damage: 130,
       desc: "Cheap burst of explosive damage in a small area." },
-    { key: "merc",   name: "Mercenaries", icon: "🗡️", cost: 35, cooldownSec: 30, targeted: true, color: "#c0a062", mercs: 2, mercHp: 160, mercDmg: 22, mercSec: 18,
+    { key: "merc",   name: "Field Team",  iconKey: "fieldteam", cost: 35, cooldownSec: 30, targeted: true, color: "#c0a062", mercs: 2, mercHp: 160, mercDmg: 22, mercSec: 18,
       desc: "Drops 2 sellswords that block & fight enemies for 18s." },
 ];
 const BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS.reduce((m, it) => { m[it.key] = it; return m; }, {});
 if (typeof window !== "undefined") { window.BATTLE_ITEMS = BATTLE_ITEMS; window.BATTLE_ITEMS_BY_KEY = BATTLE_ITEMS_BY_KEY; }
+const uiIconMarkup = name => `<svg class="ui-icon" aria-hidden="true"><use href="assets/ui/icons.svg#icon-${name}"></use></svg>`;
 
 // NOTE: the old per-entity STATIC image entries (hero_einstein → einstein.png,
 // tower_physics_1 → physics_1.png, enemy_* → <key>.png, proj_*) were removed —
@@ -27,7 +28,7 @@ if (typeof window !== "undefined") { window.BATTLE_ITEMS = BATTLE_ITEMS; window.
 // Projectiles are intentionally vector-drawn (with motion trails).
 const ASSETS_MANIFEST = {
     // UI/Backgrounds
-    "bg_menu": "assets/ui/fantasy_bg.png",
+    "bg_menu": "assets/ui/fantasy_bg.jpg",
 
     // Projectiles (Batch 5, generated 2026-06-12) — static images;
     // Projectile.draw() spins them and adds the motion trail in code.
@@ -59,7 +60,7 @@ window.SHEET_META = {};
         window.SHEET_META[key] = { frameW: 64, frameH: 64, ...cfg };
     }));
 
-    const TOWERS = ["physics", "chemistry", "biology", "astronomy"];
+    const TOWERS = ["physics", "chemistry", "biology", "astronomy", "volcano", "barracks"];
     const TIERS = ["1", "3", "4"];
     const TOWER_STATES = {
         idle:   { cols: 6, fps: 8,  loop: true  },
@@ -70,6 +71,8 @@ window.SHEET_META = {};
         ASSETS_MANIFEST[key] = `assets/towers/${t}_${tier}_${state}.png`;
         window.SHEET_META[key] = { frameW: 64, frameH: 64, ...cfg };
     })));
+    ASSETS_MANIFEST.hero_fieldteam_walk = "assets/heroes/fieldteam_walk.png";
+    window.SHEET_META.hero_fieldteam_walk = { frameW: 64, frameH: 64, cols: 6, fps: 9, loop: true };
 
     // Enemies — one looping WALK strip each (enemies are always moving, so a
     // single move cycle is all they need; defeat keeps the squash + particle
@@ -78,15 +81,39 @@ window.SHEET_META = {};
     const ENEMIES = ["flatearth", "phlogiston", "spontaneous", "maggot", "alchemy",
         "perpetual", "geocentric", "miasma", "caloric", "aether", "vitalism",
         "humours", "creationist", "homunculus", "homunculus_core", "golem", "golem_molten"];
+    const CAMPAIGN_PRODUCTION = {
+        flatearth: "assets/enemies/candidates/flatearth_walk_v2.png",
+        phlogiston: "assets/enemies/candidates/phlogiston_walk_v2.png",
+        spontaneous: "assets/enemies/candidates/spontaneous_walk_v2.png",
+        maggot: "assets/enemies/candidates/maggot_walk_v2.png",
+        alchemy: "assets/enemies/candidates/alchemy_walk_v2.png",
+        perpetual: "assets/enemies/candidates/perpetual_walk_v2.png",
+        geocentric: "assets/enemies/candidates/geocentric_walk_v2.png",
+        miasma: "assets/enemies/candidates/miasma_walk_v2.png",
+        caloric: "assets/enemies/candidates/caloric_walk_v2.png",
+        aether: "assets/enemies/candidates/aether_walk_v2.png",
+        vitalism: "assets/enemies/candidates/vitalism_walk_v2.png",
+        humours: "assets/enemies/candidates/humours_walk_v2.png",
+        creationist: "assets/enemies/candidates/creationist_walk_v2.png",
+        homunculus: "assets/enemies/candidates/homunculus_walk_v2.png",
+        homunculus_core: "assets/enemies/candidates/homunculus_core_walk_v2.png",
+        golem: "assets/enemies/candidates/golem_walk_v2.png",
+        golem_molten: "assets/enemies/candidates/golem_molten_walk_v2.png",
+        boss_geo: "assets/enemies/candidates/boss_geo_walk_v2.png",
+        boss_phlog: "assets/enemies/candidates/boss_phlog_walk_v2.png",
+        boss_aether: "assets/enemies/candidates/boss_aether_walk_v2.png",
+        boss_miasma: "assets/enemies/candidates/boss_miasma_walk_v2.png",
+        boss_entropy: "assets/enemies/candidates/boss_entropy_walk_v2.png",
+    };
     ENEMIES.forEach(e => {
         const key = `enemy_${e}_walk`;
-        ASSETS_MANIFEST[key] = `assets/enemies/${e}_walk.png`;
+        ASSETS_MANIFEST[key] = CAMPAIGN_PRODUCTION[e] || `assets/enemies/${e}_walk.png`;
         window.SHEET_META[key] = { frameW: 64, frameH: 64, cols: 6, fps: 10, loop: true };
     });
     const BOSSES = ["boss_geo", "boss_phlog", "boss_aether", "boss_miasma", "boss_entropy"];
     BOSSES.forEach(e => {
         const key = `enemy_${e}_walk`;
-        ASSETS_MANIFEST[key] = `assets/enemies/${e}_walk.png`;
+        ASSETS_MANIFEST[key] = CAMPAIGN_PRODUCTION[e] || `assets/enemies/${e}_walk.png`;
         window.SHEET_META[key] = { frameW: 128, frameH: 128, cols: 6, fps: 8, loop: true };
     });
 
@@ -98,9 +125,10 @@ window.SHEET_META = {};
         "aether", "marsh", "tectonic", "forge", "cavern", "storm", "toxic", "stellar",
         "twin_spires", "ocean", "magnetic", "radiation", "singularity", "heat_death"];
     LEVEL_THEMES.forEach((theme, id) => {
-        ASSETS_MANIFEST[`bg_level_${id}`] = `assets/levels/${theme}.png`;
+        ASSETS_MANIFEST[`bg_level_${id}`] = `assets/levels/${theme}.webp`;
     });
 })();
+if (typeof window !== "undefined") window.ASSETS_MANIFEST = ASSETS_MANIFEST;
 
 // Draw one frame of an animated strip into (dx,dy,dw,dh). Resolves the key
 // `${baseKey}_${state}`, falling back to the `_idle` sheet, then to a static
@@ -148,9 +176,9 @@ class Game {
         this.canvas = document.getElementById("game-canvas");
         this.ctx = this.canvas.getContext("2d");
         
-        // Size setup
-        this.canvas.width = GAME_WIDTH;
-        this.canvas.height = GAME_HEIGHT;
+        // Keep all game logic in the authored 900x550 coordinate system while
+        // giving high-density screens a crisp physical backing store.
+        this.configureCanvasBacking();
 
         // Managers and Pools
         this.questionManager = new QuestionManager();
@@ -159,6 +187,14 @@ class Game {
         this.level = null; // Current level object
         this.isEndless = false;
         this.PATH_CLEARANCE = 34; // min px from path centerline for a build pad
+        this.gameClock = new GameClock(60);
+        this.reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
+        this.reducedMotion = !!this.reducedMotionQuery.matches;
+        window.SCI_REDUCED_MOTION = this.reducedMotion;
+        if (this.reducedMotionQuery.addEventListener) this.reducedMotionQuery.addEventListener("change", event => {
+            this.reducedMotion = !!event.matches;
+            window.SCI_REDUCED_MOTION = this.reducedMotion;
+        });
 
         // --- Late-game difficulty ramp (engagement) -----------------------
         // Levels 1–3 are the onboarding curve and stay untouched. From Level 4
@@ -222,6 +258,8 @@ class Game {
         this.shakeMag = 0;
         this._cryoUntil = 0;           // performance.now() ts until which the cryo freeze overlay shows
         this._itemBarBuilt = false;
+        this._hudRefs = {};
+        this._lastDynamicHudAt = 0;
         this.ideaBubbles = [];
         this.bubbleSpawnTimer = 300; // spawn bubble every few seconds
 
@@ -236,33 +274,19 @@ class Game {
         // Mouse coordinates
         this.mouseX = 0;
         this.mouseY = 0;
+        this.keyboardPadIndex = 0;
 
         // Asset Loader Preloading System
-        window.spriteAssets = {};
+        window.spriteAssets = window.spriteAssets || {};
         this.loadedAssetsCount = 0;
-        this.totalAssetsCount = Object.keys(ASSETS_MANIFEST).length;
+        // Large per-level paintings are loaded only when a level is selected.
+        // Keeping them out of the eager set avoids decoding all 20 backgrounds
+        // on mobile before the player has chosen a map.
+        this.coreAssetKeys = ["bg_menu", "proj_flask", "proj_spore", "proj_bullet", "proj_gravity"];
+        this.totalAssetsCount = this.coreAssetKeys.length;
         this.assetsLoaded = false;
-        
-        Object.entries(ASSETS_MANIFEST).forEach(([key, path]) => {
-            const img = new Image();
-            img.src = path;
-            img.onload = () => {
-                window.spriteAssets[key] = img;
-                this.loadedAssetsCount++;
-                if (this.loadedAssetsCount === this.totalAssetsCount) {
-                    this.assetsLoaded = true;
-                    console.log("All PNG assets successfully loaded!");
-                }
-            };
-            img.onerror = () => {
-                // Graceful fallback trigger
-                console.warn(`PNG Sprite not found: ${path}. Falling back to 2D Cartoon Vector Procedural Drawing.`);
-                this.loadedAssetsCount++;
-                if (this.loadedAssetsCount === this.totalAssetsCount) {
-                    this.assetsLoaded = true;
-                }
-            };
-        });
+
+        this.coreAssetKeys.forEach(key => this.loadAsset(key, true));
 
         // Meta-progression (stars + permanent upgrades), persisted in localStorage.
         this.levelStars = this.loadStars();
@@ -275,6 +299,111 @@ class Game {
 
         this.initEventListeners();
         this.startGameLoop();
+    }
+
+    configureCanvasBacking(dpr = (window.devicePixelRatio || 1)) {
+        this.renderDpr = Math.max(1, Math.min(3, Number(dpr) || 1));
+        this.canvas.width = Math.round(GAME_WIDTH * this.renderDpr);
+        this.canvas.height = Math.round(GAME_HEIGHT * this.renderDpr);
+        if (this.canvas.style) {
+            this.canvas.style.aspectRatio = `${GAME_WIDTH} / ${GAME_HEIGHT}`;
+        }
+        if (this.ctx && this.ctx.setTransform) {
+            this.ctx.setTransform(this.renderDpr, 0, 0, this.renderDpr, 0, 0);
+        }
+    }
+
+    interpolatedCoordinate(actor, axis, alpha = this.gameClock.alpha) {
+        const current = actor[axis];
+        const previous = actor[axis === "x" ? "previousX" : "previousY"];
+        const t = Math.max(0, Math.min(1, Number(alpha) || 0));
+        return Number.isFinite(previous) && Number.isFinite(current)
+            ? previous + (current - previous) * t
+            : current;
+    }
+
+    loadAsset(key, countTowardsCore = false) {
+        const path = ASSETS_MANIFEST[key];
+        if (!path) return Promise.resolve(null);
+        const existing = window.spriteAssets[key];
+        if (existing && existing.complete && existing.naturalWidth > 0) return Promise.resolve(existing);
+        if (!this._assetPromises) this._assetPromises = {};
+        if (this._assetPromises[key]) return this._assetPromises[key];
+
+        this._assetPromises[key] = new Promise(resolve => {
+            const img = new Image();
+            const finish = loaded => {
+                if (loaded) window.spriteAssets[key] = img;
+                if (countTowardsCore) {
+                    this.loadedAssetsCount++;
+                    if (this.loadedAssetsCount >= this.totalAssetsCount) {
+                        this.assetsLoaded = true;
+                        console.log("Core gameplay art loaded; level paintings remain on demand.");
+                    }
+                }
+                resolve(loaded ? img : null);
+            };
+            img.onload = () => finish(true);
+            img.onerror = () => {
+                // Level paintings ship as WebP with their original PNG as a
+                // compatibility fallback for older embedded browsers.
+                if (path.endsWith(".webp") && !img._triedPngFallback) {
+                    img._triedPngFallback = true;
+                    img.src = path.replace(/\.webp$/, ".png");
+                    return;
+                }
+                console.warn(`Sprite not found: ${path}. Falling back to procedural drawing.`);
+                finish(false);
+            };
+            img.src = path;
+        });
+        return this._assetPromises[key];
+    }
+
+    getLevelAssetKeys(levelId) {
+        const level = LEVEL_DATA[levelId];
+        if (!level) return [];
+        const enemyTypes = new Set((level.waves || []).flat().map(spawn => spawn.type));
+        if (enemyTypes.has("spontaneous")) enemyTypes.add("maggot");
+        if (enemyTypes.has("homunculus")) enemyTypes.add("homunculus_core");
+        if (enemyTypes.has("golem")) enemyTypes.add("golem_molten");
+
+        const keys = new Set([`bg_level_${levelId}`]);
+        enemyTypes.forEach(type => keys.add(`enemy_${type}_walk`));
+
+        const unlocks = this.getLevelUnlocks(levelId);
+        unlocks.towers
+            .forEach(t => ["1", "3", "4"].forEach(tier => ["idle", "attack"].forEach(state => {
+                keys.add(`tower_${t}_${tier}_${state}`);
+            })));
+        if (unlocks.towers.includes("barracks")) keys.add("hero_fieldteam_walk");
+
+        const heroRoster = ["einstein", "curie", "newton", "darwin"];
+        const heroes = [heroRoster[levelId % heroRoster.length]];
+        if (levelId >= 3) heroes.push(heroRoster[(levelId + 2) % heroRoster.length]);
+        heroes.forEach(hero => ["idle", "walk", "attack"].forEach(state => keys.add(`hero_${hero}_${state}`)));
+        if (heroes.includes("darwin")) ["idle", "walk"].forEach(state => keys.add(`hero_tortoise_${state}`));
+        return [...keys].filter(key => ASSETS_MANIFEST[key]);
+    }
+
+    releaseLevelAssets(nextKeys = []) {
+        const keep = new Set([...this.coreAssetKeys, ...nextKeys]);
+        (this._levelAssetKeys || []).forEach(key => {
+            if (keep.has(key)) return;
+            const img = window.spriteAssets[key];
+            if (img) {
+                try { img.src = ""; } catch (e) {}
+                delete window.spriteAssets[key];
+            }
+            if (this._assetPromises) delete this._assetPromises[key];
+        });
+    }
+
+    ensureLevelAssets(levelId) {
+        const keys = this.getLevelAssetKeys(levelId);
+        this.releaseLevelAssets(keys);
+        this._levelAssetKeys = keys;
+        return Promise.all(keys.map(key => this.loadAsset(key, false)));
     }
 
     // ---- Meta-progression -------------------------------------------------
@@ -343,7 +472,7 @@ class Game {
         this.saveSeenEnemies();
         // Flag a "new entry" toast (only if we have data for it).
         const entry = (window.BESTIARY || []).find(b => b.key === type);
-        if (entry) this.showInGameNotification(`📖 New Bestiary entry: ${entry.name}!`);
+        if (entry) this.showInGameNotification(`New Field Notes entry: ${entry.name}!`);
     }
 
     // Render the Bestiary screen. Entries unlock on first encounter.
@@ -407,8 +536,17 @@ class Game {
 
     startLevel(levelIndex, endless = false) {
         this.level = JSON.parse(JSON.stringify(LEVEL_DATA[levelIndex]));
+        // Begin fetching only this battlefield's large painting. The procedural
+        // scene renders immediately and swaps to the painting when it is ready.
+        this.ensureLevelAssets(levelIndex);
         this.isEndless = endless;
         this.unlocks = this.getLevelUnlocks(levelIndex);
+
+        // Generate the single route contract used by painting, movement,
+        // targeting, build clearance, splitting and barracks rally points.
+        const controls = this.level.controlPoints || this.level.waypoints || [];
+        this.level.route = new PathGeometry(controls, this.level.routeOptions || {});
+        this.level.waypoints = this.level.route.controlPoints;
 
         // Drop any authored build pad that overlaps the road, so a tower can
         // never be placed on the path. Clearance = path half-width (18) + pad
@@ -450,6 +588,7 @@ class Game {
         this.isPaused = false;
         this.nextWaveCountdown = 0;
         this.gameSpeed = 1;
+        this.gameClock.reset();
 
         // Battle items + aim modes are per-run state: cooldowns must not carry
         // over from the previous level/attempt, and abandoning mid-aim must not
@@ -504,12 +643,13 @@ class Game {
     }
 
     initEventListeners() {
-        // Track Mouse
-        this.canvas.addEventListener("mousemove", (e) => {
+        // Unified mouse, pen and touch tracking. CSS applies touch-action:none
+        // only to the battlefield so the surrounding Field Kit remains scrollable.
+        this.canvas.addEventListener("pointermove", (e) => {
             const rect = this.canvas.getBoundingClientRect();
             // Scale mouse coordinates to match internal canvas width/height under any layout scaling
-            this.mouseX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-            this.mouseY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+            this.mouseX = (e.clientX - rect.left) * (GAME_WIDTH / rect.width);
+            this.mouseY = (e.clientY - rect.top) * (GAME_HEIGHT / rect.height);
 
             // Update hover flags for towers
             this.towers.forEach(t => {
@@ -528,19 +668,43 @@ class Game {
             if (this.gameState !== "playing" || this.isPaused) return;
             const tag = (e.target && e.target.tagName) || "";
             if (tag === "INPUT" || tag === "TEXTAREA") return;
-            if (e.key === "Escape") { this.cancelSkillTargeting(); return; }
+            if (e.key === "Escape") {
+                this.cancelSkillTargeting();
+                this.selectedTowerType = null;
+                document.querySelectorAll(".shop-btn").forEach(btn => btn.classList.remove("active"));
+                return;
+            }
+            if (document.activeElement === this.canvas && this.selectedTowerType) {
+                const pads = (this.level && this.level.buildSpots || []).filter(p => !p.occupied);
+                if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key) && pads.length) {
+                    e.preventDefault();
+                    const delta = (e.key === "ArrowLeft" || e.key === "ArrowUp") ? -1 : 1;
+                    this.keyboardPadIndex = (this.keyboardPadIndex + delta + pads.length) % pads.length;
+                    this.mouseX = pads[this.keyboardPadIndex].x;
+                    this.mouseY = pads[this.keyboardPadIndex].y;
+                    this.showInGameNotification(`Build pad ${this.keyboardPadIndex + 1} of ${pads.length}. Press Enter to place.`);
+                    return;
+                }
+                if ((e.key === "Enter" || e.key === " ") && pads.length) {
+                    e.preventDefault();
+                    const pad = pads[this.keyboardPadIndex % pads.length];
+                    this.placeTower(pad.x, pad.y);
+                    return;
+                }
+            }
             const n = parseInt(e.key, 10);
             if (n >= 1 && n <= this.heroes.length) { e.preventDefault(); this.activateHeroAbility(n - 1); }
         });
 
-        // Click actions
-        this.canvas.addEventListener("click", (e) => {
+        // Tap/click actions
+        this.canvas.addEventListener("pointerup", (e) => {
             if (this.gameState !== "playing" || this.isPaused) return;
+            if (e.pointerType === "touch") e.preventDefault();
 
             const rect = this.canvas.getBoundingClientRect();
             // Scale click coordinates to match internal canvas coordinates
-            const clickX = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-            const clickY = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+            const clickX = (e.clientX - rect.left) * (GAME_WIDTH / rect.width);
+            const clickY = (e.clientY - rect.top) * (GAME_HEIGHT / rect.height);
 
             console.log(`Canvas clicked at: ${Math.round(clickX)}, ${Math.round(clickY)}`);
             console.log(`Selected Tower Type: ${this.selectedTowerType}`);
@@ -744,6 +908,10 @@ class Game {
 
     isNearPath(x, y, minDistance) {
         if (!this.level || !this.level.waypoints) return false;
+        if (this.level.route && typeof this.level.route.nearestPoint === "function") {
+            const nearest = this.level.route.nearestPoint(x, y);
+            return !!nearest && nearest.separation < minDistance;
+        }
         const wps = this.level.waypoints;
 
         for (let i = 0; i < wps.length - 1; i++) {
@@ -870,6 +1038,9 @@ class Game {
     spawnEnemy(type) {
         const wp = this.level.waypoints;
         if (wp.length === 0) return;
+        if (!this.level.route) {
+            this.level.route = new PathGeometry(this.level.controlPoints || wp, this.level.routeOptions || {});
+        }
 
         let enemy;
         // Difficulty scales with BOTH the level reached AND the wave number, so
@@ -900,13 +1071,14 @@ class Game {
         else enemy = new FlatEarthEnemy(wp[0].x, wp[0].y, scale);
 
         enemy.bestiaryKey = type;
-        enemy.setPath(wp);
+        enemy.setPath(this.level.route);
         this.enemies.push(enemy);
         this.recordBestiaryEncounter(type);
     }
 
     // Request a screen shake; concurrent requests keep the strongest.
     addShake(mag, frames) {
+        if (this.reducedMotion) return;
         if (mag >= this.shakeMag || this.shakeFrames <= 0) {
             this.shakeMag = mag;
             this.shakeFrames = frames;
@@ -916,6 +1088,15 @@ class Game {
 
     update() {
         if (this.gameState !== "playing" || this.isPaused) return;
+
+        // Capture the last committed simulation pose before the next fixed
+        // tick. draw() blends this pose toward the current one with clock.alpha.
+        [...this.heroes, ...this.summonedMinions, ...this.enemies, ...this.projectiles].forEach(actor => {
+            if (Number.isFinite(actor.x) && Number.isFinite(actor.y)) {
+                actor.previousX = actor.x;
+                actor.previousY = actor.y;
+            }
+        });
 
         if (this.shakeFrames > 0) this.shakeFrames--;
 
@@ -969,6 +1150,10 @@ class Game {
         // 2. Flying question bubble spawning
         this.bubbleSpawnTimer--;
         if (this.bubbleSpawnTimer <= 0) {
+            if (this.isWaveActive) {
+                // Reading is concentrated in setup and between-wave phases.
+                this.bubbleSpawnTimer = 180;
+            } else {
             this.ideaBubbles.push({
                 x: 100 + Math.random() * (GAME_WIDTH - 200),
                 y: GAME_HEIGHT + 30,
@@ -981,6 +1166,7 @@ class Game {
             // between-wave "Solve to Rush" prompt is the primary quiz moment now);
             // more frequent during the calmer build / between-wave phases.
             this.bubbleSpawnTimer = (this.isWaveActive ? 900 : 420) + Math.random() * 300;
+            }
         }
 
         // Update floating bubbles
@@ -1070,8 +1256,7 @@ class Game {
                     // Spawn 2 maggots nearby heading to same next waypoint
                     for (let i = 0; i < 2; i++) {
                         const maggot = new SpontaneousEnemy(e.x + (i*10 - 5), e.y + (i*10 - 5), e.levelScale, true);
-                        maggot.waypoints = e.waypoints;
-                        maggot.currentWaypointIndex = e.currentWaypointIndex;
+                        maggot.setPath(e.route || e.waypoints, e.pathDistance || 0);
                         bornThisFrame.push(maggot);
                     }
                 }
@@ -1088,6 +1273,9 @@ class Game {
     }
 
     draw() {
+        // setTransform is repeated defensively because resizing a canvas resets
+        // its context state in every browser.
+        if (this.ctx.setTransform) this.ctx.setTransform(this.renderDpr || 1, 0, 0, this.renderDpr || 1, 0, 0);
         this.ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
         // Enable smoothing for polished anti-aliased 2D cartoon vectors
@@ -1124,7 +1312,7 @@ class Game {
             }
 
             // Draw Road paths
-            LevelManager.drawPath(this.ctx, this.level.waypoints, this.level.pathColor, this.level.accentColor);
+            LevelManager.drawPath(this.ctx, this.level.route || this.level.waypoints, this.level.pathColor, this.level.accentColor);
 
             // Spawn portal (enemies emerge) + defended base (path end). Drawn on
             // top of the road so it reads as the source/destination; enemies draw
@@ -1170,27 +1358,47 @@ class Game {
                 });
             }
 
-            // Draw Blocker Minions
-            this.summonedMinions.forEach(m => m.draw(this.ctx));
-
-            // Draw Towers
-            this.towers.forEach(t => t.draw(this.ctx));
-
-            // Draw Heroes
-            this.heroes.forEach(h => h.draw(this.ctx));
-
-            // Draw Enemies
-            this.enemies.forEach(e => e.draw(this.ctx));
+            // Ground actors share one depth order. Sorting by their foot-point
+            // makes units naturally pass in front of/behind towers and heroes,
+            // which gives the painted maps the same readable 2.5D layering as
+            // the route itself.
+            const groundActors = [
+                ...this.summonedMinions,
+                ...this.towers,
+                ...this.heroes,
+                ...this.enemies,
+            ];
+            const alpha = Math.max(0, Math.min(1, this.gameClock.alpha));
+            const renderCoord = (actor, axis) => this.interpolatedCoordinate(actor, axis, alpha);
+            const drawInterpolated = actor => {
+                if (!actor || typeof actor.draw !== "function") return;
+                const x = actor.x, y = actor.y;
+                actor.x = renderCoord(actor, "x");
+                actor.y = renderCoord(actor, "y");
+                actor.draw(this.ctx);
+                actor.x = x; actor.y = y;
+            };
+            groundActors.sort((a, b) => (renderCoord(a, "y") - renderCoord(b, "y")) || (renderCoord(a, "x") - renderCoord(b, "x")));
+            groundActors.forEach(drawInterpolated);
 
             // Draw Projectiles
-            this.projectiles.forEach(p => p.draw(this.ctx));
+            this.projectiles.forEach(drawInterpolated);
 
             // Draw Particles & Lines
             this.particleSystem.draw(this.ctx);
 
+            // Explicit post-actor foreground pass: rocks, reeds, instruments
+            // and terrain lips can hide feet and lower bodies, proving actual
+            // battlefield occlusion in addition to actor y-sorting.
+            LevelManager.drawForeground(this.ctx, this.level);
+
             // Keep the hero ability bar's cooldown/revive sweep smooth.
-            this.renderHeroAbilityBar();
-            this.renderBattleItems();
+            const hudNow = performance.now();
+            if (hudNow - this._lastDynamicHudAt >= 100) {
+                this._lastDynamicHudAt = hudNow;
+                this.renderHeroAbilityBar();
+                this.renderBattleItems();
+            }
 
             // Cryo Field freeze overlay — frosty vignette while active.
             // (Gradient is screen-static, so build it once and reuse.)
@@ -1251,7 +1459,7 @@ class Game {
                 this.ctx.fillStyle = b.color;
                 this.ctx.font = "bold 20px 'VT323', monospace";
                 this.ctx.textAlign = "center";
-                this.ctx.fillText("💡", b.x, b.y + 6);
+                this.ctx.fillText("?", b.x, b.y + 6);
 
                 this.ctx.restore();
             });
@@ -1336,7 +1544,7 @@ class Game {
                 this.ctx.stroke();
 
                 // instruction banner (top-centre, below any boss bar)
-                const label = `🎯 ${hero.name}: ${hero.skillName} — click to cast · Esc to cancel`;
+                const label = `AIM · ${hero.name}: ${hero.skillName} — click to cast · Esc to cancel`;
                 this.ctx.font = "bold 14px 'Nunito', sans-serif";
                 this.ctx.textAlign = "center";
                 const tw = this.ctx.measureText(label).width;
@@ -1378,14 +1586,10 @@ class Game {
                 this.ctx.stroke();
                 this.ctx.setLineDash([]);
 
-                // icon at the cursor
-                this.ctx.globalAlpha = 1;
-                this.ctx.font = "22px 'Nunito', sans-serif";
-                this.ctx.textAlign = "center";
-                this.ctx.fillText(def.icon, ax, ay + 8);
-
                 // banner
-                const label = `${def.icon} ${def.name} — click to deploy · Esc to cancel`;
+                this.ctx.globalAlpha = 1;
+                this.ctx.textAlign = "center";
+                const label = `${def.name} — tap to deploy · Esc to cancel`;
                 this.ctx.font = "bold 14px 'Nunito', sans-serif";
                 const tw = this.ctx.measureText(label).width;
                 const bx = GAME_WIDTH / 2, by = 44;
@@ -1404,11 +1608,12 @@ class Game {
     }
 
     startGameLoop() {
-        const loop = () => {
-            // Fast-forward runs the fixed-step simulation N times per frame.
-            // All in-game timers are frame-based, so this scales time exactly.
-            const steps = (this.gameState === "playing" && !this.isPaused) ? this.gameSpeed : 1;
-            for (let i = 0; i < steps; i++) this.update();
+        const loop = timestamp => {
+            // Accumulate elapsed wall time and consume it in exact 60 Hz ticks.
+            // 120 Hz screens therefore render more often without running combat
+            // faster; 2x scales simulation time rather than frame count.
+            const active = this.gameState === "playing" && !this.isPaused;
+            this.gameClock.advance(timestamp, () => this.update(), this.gameSpeed, active);
             this.draw();
             requestAnimationFrame(loop);
         };
@@ -1416,17 +1621,21 @@ class Game {
     }
 
     // HTML DOM UI updates
+    hudRef(id) {
+        return this._hudRefs[id] || (this._hudRefs[id] = document.getElementById(id));
+    }
+
     updateSidebarUI() {
-        document.getElementById("ui-gold").textContent = this.gold;
-        document.getElementById("ui-lives").textContent = this.lives;
-        document.getElementById("ui-rp").textContent = this.researchPoints;
-        document.getElementById("ui-wave").textContent = this.isEndless ? `${this.waveNumber} (Endless)` : `${this.waveNumber}/${this.level ? this.level.waves.length : 5}`;
+        this.hudRef("ui-gold").textContent = this.gold;
+        this.hudRef("ui-lives").textContent = this.lives;
+        this.hudRef("ui-rp").textContent = this.researchPoints;
+        this.hudRef("ui-wave").textContent = this.isEndless ? `${this.waveNumber} (Endless)` : `${this.waveNumber}/${this.level ? this.level.waves.length : 5}`;
 
         // Update wave start / call-wave button text
         this.refreshWaveButton();
 
         // Render Scientist Hero skill triggers on HUD
-        const container = document.getElementById("hud-hero-skills");
+        const container = this.hudRef("hud-hero-skills");
         container.innerHTML = "";
         
         this.heroes.forEach((h, index) => {
@@ -1481,7 +1690,7 @@ class Game {
             this.isTargetingSkill = true;
             this.targetingHeroIndex = index;
             this.canvas.style.cursor = "crosshair";
-            this.showInGameNotification(`🎯 Aiming ${hero.skillName} — click the battlefield to cast (Esc to cancel)`);
+            this.showInGameNotification(`Aiming ${hero.skillName} — click the battlefield to cast (Esc to cancel)`);
         } else {
             this.showInGameNotification(`${hero.name}'s ${hero.skillName} is recharging (${Math.ceil(hero.skillCooldownTimer / 60)}s)`);
         }
@@ -1527,7 +1736,7 @@ class Game {
             this.isTargetingItem = true;
             this.activeItemKey = key;
             this.canvas.style.cursor = "crosshair";
-            this.showInGameNotification(`🎯 ${def.icon} ${def.name} — click the battlefield to deploy (Esc to cancel)`);
+            this.showInGameNotification(`${def.name} armed — tap the battlefield to deploy (Esc to cancel)`);
         } else {
             this.castBattleItem(key, 0, 0);
         }
@@ -1548,7 +1757,7 @@ class Game {
             this.enemies.forEach(e => { if (!e.isDead && e.applySlow) e.applySlow(0.04, def.freezeSec); });
             if (ps) {
                 this.enemies.forEach(e => ps.createExplosion(e.x, e.y, "#bff4ff", 6, 2));
-                ps.addFloatingText(GAME_WIDTH / 2, 80, "❄️ CRYO FIELD!", def.color, 20, 1.6);
+                ps.addFloatingText(GAME_WIDTH / 2, 80, "CRYO FIELD!", def.color, 20, 1.6);
             }
             if (window.audioManager) window.audioManager.playSfx("hero_curie_skill");
         } else if (key === "meteor" || key === "bomb") {
@@ -1556,7 +1765,7 @@ class Game {
             if (ps) {
                 ps.createExplosion(x, y, def.color, key === "meteor" ? 40 : 22, key === "meteor" ? 6 : 4);
                 ps.createShockwave(x, y, def.radius, def.color, 6, 3);
-                ps.addFloatingText(x, y - 20, def.icon + " " + def.name + "!", def.color, 16, 1.4);
+                ps.addFloatingText(x, y - 20, def.name.toUpperCase() + "!", def.color, 16, 1.4);
             }
             this.enemies.forEach(e => {
                 if (e.isDead) return;
@@ -1572,7 +1781,7 @@ class Game {
             }
             if (ps) {
                 ps.createShockwave(x, y, 50, def.color, 3, 2);
-                ps.addFloatingText(x, y - 20, "🗡️ MERCENARIES!", def.color, 15, 1.4);
+                ps.addFloatingText(x, y - 20, "FIELD TEAM!", def.color, 15, 1.4);
             }
             if (window.audioManager) window.audioManager.playSfx("tower_barracks_place");
         }
@@ -1592,7 +1801,7 @@ class Game {
                 btn.className = "item-btn";
                 btn.id = `item-btn-${def.key}`;
                 btn.title = def.desc;
-                btn.innerHTML = `<span class="item-cd"></span><span class="item-icon">${def.icon}</span><span class="item-name">${def.name}</span><span class="item-cost">${def.cost} RP</span>`;
+                btn.innerHTML = `<span class="item-cd"></span><span class="item-icon">${uiIconMarkup(def.iconKey)}</span><span class="item-name">${def.name}</span><span class="item-cost">${def.cost} RP</span>`;
                 btn.addEventListener("click", (e) => { e.stopPropagation(); this.selectBattleItem(def.key); });
                 bar.appendChild(btn);
             });
@@ -1703,7 +1912,9 @@ class Game {
         const container = document.getElementById("level-select-container");
         if (!container || !window.LEVEL_DATA) return;
         container.innerHTML = "";
-        const bossTag = { 4: "👑 Mini-Boss", 9: "👑 Mini-Boss", 14: "👑👑 Twin Mini-Bosses", 19: "💀 FINAL BOSS" };
+        const bossTag = { 4: "Mini-Boss", 9: "Mini-Boss", 14: "Twin Mini-Bosses", 19: "Final Boss" };
+        const biomeNames = { lab: "Physics Laboratory", swamp: "Primordial Wetlands", volcanic: "Volcanic Rift", tundra: "Frozen Field", observatory: "Observatory", alchemy: "Alchemy Workshop", aether: "Aether Expanse", marsh: "Miasma Marsh", tectonic: "Tectonic Shelf", forge: "Phlogiston Forge", cavern: "Crystal Cavern", storm: "Storm Front", toxic: "Toxic Basin", stellar: "Stellar Reach", twin_spires: "Twin Spires", ocean: "Ocean Trench", magnetic: "Magnetic Wastes", radiation: "Radiation Zone", singularity: "Singularity", heat_death: "Heat-Death Frontier" };
+        const enemyNames = { flatearth: "Flat Earth", phlogiston: "Phlogiston", spontaneous: "Spontaneous Generation", geocentric: "Geocentric", alchemy: "Alchemy", perpetual: "Perpetual Motion", caloric: "Caloric", miasma: "Miasma", aether: "Aether", vitalism: "Vitalism", humours: "Four Humours", creationist: "Creationism", homunculus: "Homunculus", golem: "Alchemy Golem" };
         const starsFor = (idx) => this.levelStars[(window.LEVEL_DATA[idx].id != null ? window.LEVEL_DATA[idx].id : idx)] || 0;
         window.LEVEL_DATA.forEach((lv, idx) => {
             const stars = starsFor(idx);
@@ -1711,28 +1922,33 @@ class Game {
             const boss = bossTag[idx];
             const diff = idx < 5 ? "Easy" : idx < 10 ? "Moderate" : idx < 15 ? "Hard" : "Extreme";
             const title = String(lv.name || `Level ${idx + 1}`).replace(/^level\s*\d+\s*[:\-]?\s*/i, "");
+            const roster = [...new Set((lv.waves || []).flat().map(spawn => spawn.type).filter(type => !type.startsWith("boss_")))].slice(0, 3);
             // A level unlocks once the previous one has been beaten (≥1 star).
             const unlocked = idx === 0 || starsFor(idx - 1) >= 1;
-            const card = document.createElement("div");
+            const card = document.createElement("article");
             card.className = "level-card" + (boss ? " boss-level" : "") + (unlocked ? "" : " locked-level");
             if (unlocked) {
-                card.addEventListener("click", () => launchLevel(idx, false));
                 card.innerHTML = `
-                    <h3>Level ${idx + 1}: ${title}</h3>
-                    ${boss ? `<div class="boss-tag">${boss}</div>` : `<p style="font-size:12px; color:#9aa4b2; margin:4px 0 0;">Defend against scientific misconceptions.</p>`}
+                    <div class="level-thumb" role="img" aria-label="${biomeNames[lv.theme] || lv.theme} battlefield preview" style="background-image:linear-gradient(180deg, transparent 30%, rgba(5,12,10,.9)), url('${ASSETS_MANIFEST[`bg_level_${idx}`]}')"></div>
+                    <div class="level-card-copy"><div class="level-kicker">${biomeNames[lv.theme] || lv.theme}</div><h3>Level ${idx + 1}: ${title}</h3>
+                    <p>${lv.description || "Defend the expedition."}</p>
+                    <div class="enemy-preview" aria-label="Expected enemies">${roster.map(type => `<span>${enemyNames[type] || type}</span>`).join("")}</div>
+                    ${boss ? `<div class="boss-tag">${boss}</div>` : ""}
                     <div class="card-footer">
                         <span style="font-size:12px; color:#bdc3c7;">${diff} <span class="card-stars" style="color:#ffd700; letter-spacing:2px;">${starStr}</span></span>
-                        <button class="btn-start">DEPLOY</button>
-                    </div>
+                        <button type="button" class="btn-start" aria-label="Deploy to Level ${idx + 1}: ${title}">Deploy</button>
+                    </div></div>
                 `;
+                card.querySelector(".btn-start").addEventListener("click", () => launchLevel(idx, false));
             } else {
                 card.innerHTML = `
-                    <h3>🔒 Level ${idx + 1}</h3>
+                    <div class="level-thumb locked-thumb" aria-hidden="true" style="background-image:linear-gradient(rgba(5,12,10,.82), rgba(5,12,10,.9)), url('${ASSETS_MANIFEST[`bg_level_${idx}`]}')"></div><div class="level-card-copy">
+                    <h3>Locked — Level ${idx + 1}</h3>
                     <p style="font-size:12px; color:#9aa4b2; margin:4px 0 0;">Beat Level ${idx} to unlock.</p>
                     <div class="card-footer">
                         <span style="font-size:12px; color:#bdc3c7;">${diff}</span>
-                        <button class="btn-start" disabled>LOCKED</button>
-                    </div>
+                        <button class="btn-start" disabled>Locked</button>
+                    </div></div>
                 `;
             }
             container.appendChild(card);
@@ -1752,7 +1968,7 @@ class Game {
             if (this.hasMoreWaves()) {
                 const bonus = 50 + this.waveNumber * 6;
                 wBtn.disabled = false;
-                wBtn.textContent = `⚡ Rush Next Wave (+${bonus}G)`;
+                wBtn.textContent = `Rush Next Wave (+${bonus}G)`;
             } else {
                 wBtn.disabled = true;
                 wBtn.textContent = "Final Wave — Defend!";
@@ -1813,7 +2029,7 @@ class Game {
         if (tower.level >= 4) {
             specHtml = `<div style="font-size:12px; color:#00ff66; margin-top:8px;">Specialized: <strong>${tower.name}</strong></div>`;
         } else if (!canSpec) {
-            specHtml = `<div style="font-size:11px; color:#8c8c9a; margin-top:8px;">🔒 Higher upgrades & specialization unlock in later levels.</div>`;
+            specHtml = `<div style="font-size:11px; color:#8c8c9a; margin-top:8px;">Locked — higher upgrades and specialization unlock in later levels.</div>`;
         } else if (tower.level < 3) {
             specHtml = `<div style="font-size:11px; color:#8c8c9a; margin-top:8px;">Reach Level 3 to choose a specialization.</div>`;
         } else if (tower.level === 3) {
@@ -1855,8 +2071,8 @@ class Game {
         const showTargeting = tower.type !== "barracks" && typeof tower.cycleTargetMode === "function";
         let targetHtml = "";
         if (showTargeting) {
-            const overridden = tower.prioritizeFar ? " 🔒(Range upg → far)" : "";
-            targetHtml = `<button id="target-mode-btn" class="target-mode-btn" ${tower.prioritizeFar ? "disabled" : ""} title="Cycle which enemy this tower shoots first">🎯 Target: ${TARGET_LABELS[tower.targetMode] || tower.targetMode}${overridden}</button>`;
+            const overridden = tower.prioritizeFar ? " (Range upgrade: far)" : "";
+            targetHtml = `<button id="target-mode-btn" class="target-mode-btn" ${tower.prioritizeFar ? "disabled" : ""} title="Cycle which enemy this tower shoots first">${uiIconMarkup("research")}<span>Target: ${TARGET_LABELS[tower.targetMode] || tower.targetMode}${overridden}</span></button>`;
         }
 
         p.innerHTML = `
@@ -1950,6 +2166,10 @@ class Game {
     // (earned mainly by answering questions) AND requires correctly answering a
     // question of that tower's discipline.
     attemptBranchUnlock(tower, branchKey) {
+        if (this.isWaveActive) {
+            this.showInGameNotification("Specialization review opens between waves, when it is safe to read.");
+            return;
+        }
         const cost = tower.ultimateRpCost();
         if (this.researchPoints < cost) {
             this.showInGameNotification(`Need ${cost} RP to specialize — answer questions to earn Research Points!`);
@@ -1976,7 +2196,7 @@ class Game {
 
         modal.innerHTML = `
             <div class="question-container">
-                <div class="q-header">⚗️ SPECIALIZATION CHALLENGE: ${headerTopic}</div>
+                <div class="q-header">SPECIALIZATION CHALLENGE: ${headerTopic}</div>
                 <div style="font-size:12px; color:#ffd166; margin-bottom:8px;">Answer correctly to unlock <strong>${info.name}</strong></div>
                 <div class="q-body">${qObj.q}</div>
                 <div class="q-options">${optionsHtml}</div>
@@ -1984,6 +2204,7 @@ class Game {
                 <button id="q-close" style="display:none; margin-top:15px; width:100%; border:none; border-radius:4px; height:34px; background:#00ff66; color:#000; font-weight:bold; cursor:pointer;" onclick="closeBranchModal()">Resume Game</button>
             </div>
         `;
+        this.openAccessibleModal(modal);
     }
 
     solveBranchAnswer(index) {
@@ -2045,8 +2266,49 @@ class Game {
         }
     }
 
+    openAccessibleModal(modal) {
+        if (!modal) return;
+        this._modalReturnFocus = document.activeElement;
+        if (modal.setAttribute) modal.setAttribute("aria-hidden", "false");
+        if (!modal._focusTrapWired && modal.addEventListener) {
+            modal._focusTrapWired = true;
+            modal.addEventListener("keydown", event => {
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    if (modal.id === "pause-modal") togglePauseGame();
+                    else if (this.pendingBranch) window.closeBranchModal();
+                    else window.closeQuestionModal();
+                    return;
+                }
+                if (event.key !== "Tab") return;
+                const focusable = [...modal.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+                if (!focusable.length) { event.preventDefault(); modal.focus(); return; }
+                const first = focusable[0], last = focusable[focusable.length - 1];
+                if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+                else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+            });
+        }
+        const initial = (modal.querySelector && modal.querySelector("button:not([disabled]), [tabindex]:not([tabindex='-1'])")) || modal;
+        if (initial.focus) initial.focus();
+    }
+
+    closeAccessibleModal(modal) {
+        if (modal) {
+            modal.style.display = "none";
+            if (modal.setAttribute) modal.setAttribute("aria-hidden", "true");
+        }
+        const target = this._modalReturnFocus;
+        this._modalReturnFocus = null;
+        if (target && target.focus && (!document.contains || document.contains(target))) target.focus();
+        else if (this.canvas && this.canvas.focus) this.canvas.focus();
+    }
+
     // Floating bubble question modal
     triggerQuestionPopup() {
+        if (this.isWaveActive) {
+            this.showInGameNotification("Research questions open during setup or between waves.");
+            return;
+        }
         this.isPaused = true;
         const modal = document.getElementById("question-modal");
         const qObj = this.questionManager.getRandomQuestion();
@@ -2064,13 +2326,14 @@ class Game {
 
         modal.innerHTML = `
             <div class="question-container">
-                <div class="q-header">🔬 SCIENCE BREAKTHROUGH: ${headerTopic}</div>
+                <div class="q-header">SCIENCE BREAKTHROUGH: ${headerTopic}</div>
                 <div class="q-body">${qObj.q}</div>
                 <div class="q-options">${optionsHtml}</div>
                 <div id="q-feedback" style="display:none; font-size:13px; margin-top:15px; text-align:left; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;"></div>
                 <button id="q-close" style="display:none; margin-top:15px; width:100%; border:none; border-radius:4px; height:34px; background:#00ff66; color:#000; font-weight:bold; cursor:pointer;" onclick="closeQuestionModal()">Resume Game</button>
             </div>
         `;
+        this.openAccessibleModal(modal);
     }
 
     solveAnswer(index) {
@@ -2133,7 +2396,7 @@ class Game {
         const headerTopic = qObj.topicName || "Science";
         modal.innerHTML = `
             <div class="question-container">
-                <div class="q-header">⚡ SOLVE TO RUSH: ${headerTopic}</div>
+                <div class="q-header">SOLVE TO RUSH: ${headerTopic}</div>
                 <div style="font-size:12px; color:#ffd166; margin-bottom:8px;">Answer correctly to call the next wave early for <strong>DOUBLE</strong> gold + a full heal.</div>
                 <div class="q-body">${qObj.q}</div>
                 <div class="q-options">${optionsHtml}</div>
@@ -2141,6 +2404,7 @@ class Game {
                 <button id="q-close" style="display:none; margin-top:15px; width:100%; border:none; border-radius:4px; height:34px; background:#00ff66; color:#000; font-weight:bold; cursor:pointer;" onclick="closeQuestionModal()">Resume Game</button>
             </div>
         `;
+        this.openAccessibleModal(modal);
     }
 
     solveRushAnswer(index) {
@@ -2237,9 +2501,11 @@ window.submitAnswer = function(index) {
 };
 
 window.closeQuestionModal = function() {
-    document.getElementById("question-modal").style.display = "none";
     if (window.gameInstance) {
+        window.gameInstance.closeAccessibleModal(document.getElementById("question-modal"));
         window.gameInstance.isPaused = false;
+    } else {
+        document.getElementById("question-modal").style.display = "none";
     }
 };
 
@@ -2262,9 +2528,9 @@ window.submitBranchAnswer = function(index) {
 };
 
 window.closeBranchModal = function() {
-    document.getElementById("question-modal").style.display = "none";
     const g = window.gameInstance;
     if (!g) return;
+    g.closeAccessibleModal(document.getElementById("question-modal"));
     g.isPaused = false;
     const tower = g.pendingBranch ? g.pendingBranch.tower : null;
     g.pendingBranch = null;

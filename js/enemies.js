@@ -18,6 +18,11 @@ class Enemy {
         // Path navigation
         this.waypoints = [];
         this.currentWaypointIndex = 0;
+        this.route = null;
+        this.pathDistance = 0;
+        this.pathProgress = 0;
+        this.heading = 0;
+        this.facingX = 1;
 
         // Effects
         this.slowTimer = 0;
@@ -54,12 +59,24 @@ class Enemy {
         this.stunImmune = false;
     }
 
-    setPath(waypoints) {
-        this.waypoints = waypoints;
-        if (this.waypoints.length > 0) {
+    setPath(path, distance = 0) {
+        this.route = path && typeof path.sampleAtDistance === "function"
+            ? path
+            : (typeof PathGeometry !== "undefined" ? new PathGeometry(path || []) : null);
+        this.waypoints = this.route ? this.route.controlPoints : (path || []);
+        this.pathDistance = Math.max(0, distance || 0);
+        this.pathProgress = 0;
+        this.currentWaypointIndex = this.waypoints.length > 1 ? 1 : 0;
+        const pose = this.route && this.route.sampleAtDistance(this.pathDistance);
+        if (pose) {
+            this.x = pose.x;
+            this.y = pose.y;
+            this.heading = pose.angle;
+            if (Math.abs(pose.tangentX) > 0.05) this.facingX = pose.tangentX < 0 ? -1 : 1;
+            this.pathProgress = pose.progress;
+        } else if (this.waypoints.length > 0) {
             this.x = this.waypoints[0].x;
             this.y = this.waypoints[0].y;
-            this.currentWaypointIndex = 1;
         }
     }
 
@@ -184,11 +201,34 @@ class Enemy {
         // Walk wobble cycle
         this.walkWobble += (activeSpeed * 0.18);
 
-        if (this.currentWaypointIndex < this.waypoints.length) {
+        if (this.route && this.route.totalLength > 0) {
+            this.pathDistance += activeSpeed;
+            if (this.pathDistance >= this.route.totalLength) {
+                const end = this.route.sampleAtDistance(this.route.totalLength);
+                this.x = end.x; this.y = end.y;
+                this.pathDistance = this.route.totalLength;
+                this.pathProgress = 1;
+                this.currentWaypointIndex = this.waypoints.length;
+                this.reachedEnd = true;
+                return false;
+            }
+            const pose = this.route.sampleAtDistance(this.pathDistance);
+            this.x = pose.x;
+            this.y = pose.y;
+            this.heading = pose.angle;
+            if (Math.abs(pose.tangentX) > 0.05) this.facingX = pose.tangentX < 0 ? -1 : 1;
+            this.pathProgress = pose.progress;
+            this.currentWaypointIndex = Math.min(
+                this.waypoints.length - 1,
+                Math.max(1, Math.ceil(this.pathProgress * (this.waypoints.length - 1)))
+            );
+        } else if (this.currentWaypointIndex < this.waypoints.length) {
             const target = this.waypoints[this.currentWaypointIndex];
             const dx = target.x - this.x;
             const dy = target.y - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
+            this.heading = Math.atan2(dy, dx);
+            if (Math.abs(dx) > 0.05) this.facingX = dx < 0 ? -1 : 1;
 
             if (dist < activeSpeed) {
                 this.x = target.x;
@@ -211,7 +251,8 @@ class Enemy {
 
         // Vertical walk bob — paired with the rock-rotation it gives the
         // hop-along gait; the shadow stays grounded and shrinks at hop apex.
-        const bob = this.isDead ? 0 : Math.abs(Math.sin(this.walkWobble)) * this.size * 0.07;
+        const reduceMotion = !!window.SCI_REDUCED_MOTION;
+        const bob = this.isDead || reduceMotion ? 0 : Math.abs(Math.sin(this.walkWobble)) * this.size * 0.07;
         const bobK = 1 - (bob / (this.size * 0.07 || 1)) * 0.18;
 
         // Soft drop shadow
@@ -222,10 +263,10 @@ class Enemy {
 
         // Apply Squash & Stretch and Walk Wobble
         ctx.translate(this.x, this.y - bob);
-        ctx.scale(this.squashX, this.squashY);
+        ctx.scale(this.facingX * this.squashX, this.squashY);
 
         // Slight rocking rotation during movement
-        const rockAngle = Math.sin(this.walkWobble) * 0.08;
+        const rockAngle = reduceMotion ? 0 : Math.sin(this.walkWobble) * 0.08;
         ctx.rotate(rockAngle);
 
         // Animated walk strip → static whole image → procedural vector fallback.
@@ -311,6 +352,31 @@ class Enemy {
             ctx.fill();
         }
         ctx.restore();
+
+        // Persistent shape + letter badges make combat traits readable without
+        // depending on hue or on the details of a particular sprite sheet.
+        const traits = [];
+        if (this.armored) traits.push(["A", "Armor"]);
+        if (this.flying) traits.push(["W", "Flying"]);
+        if (this.shielded && this.shieldUp) traits.push(["S", "Shield"]);
+        if (this.healer) traits.push(["+", "Healer"]);
+        if (this.fast) traits.push([">", "Fast"]);
+        if (traits.length) {
+            ctx.save();
+            ctx.font = "bold 8px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const startX = this.x - (traits.length - 1) * 6;
+            traits.forEach((trait, index) => {
+                const x = startX + index * 12, y = this.y - this.size * 0.72;
+                ctx.fillStyle = "rgba(8,12,14,.92)";
+                ctx.strokeStyle = "#fff4d6";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.rect(x - 5, y - 5, 10, 10); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = "#fff"; ctx.fillText(trait[0], x, y + .5);
+            });
+            ctx.restore();
+        }
     }
 
     drawCartoonVector(ctx) {

@@ -933,7 +933,84 @@ const LEVEL_DATA = [
     }
 ];
 
+// Organic campaign route pass. The original maps were authored exclusively on
+// an orthogonal grid. Preserve entrances, exits and the strategic silhouette,
+// but blend each interior corner toward its neighbours. This turns the old
+// right-angle staircases into long, purposeful diagonal approaches rather than
+// merely adding a few pixels of jitter. A small perpendicular offset prevents
+// repeated parallel bends from feeling mechanically identical.
+LEVEL_DATA.forEach(level => {
+    const source = level.waypoints || [];
+    const amp = 10 + (level.id % 3) * 4;
+    level.waypoints = source.map((p, i) => {
+        if (i === 0 || i === source.length - 1) return { ...p };
+        const previous = source[i - 1];
+        const next = source[i + 1];
+        let x = previous.x * 0.17 + p.x * 0.66 + next.x * 0.17;
+        let y = previous.y * 0.17 + p.y * 0.66 + next.y * 0.17;
+        const dx = next.x - previous.x;
+        const dy = next.y - previous.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const side = ((i + level.id) % 2 ? 1 : -1) * amp;
+        x += (-dy / length) * side;
+        y += (dx / length) * side;
+        return {
+            ...p,
+            x: Math.max(24, Math.min(GAME_WIDTH - 24, Math.round(x))),
+            y: Math.max(24, Math.min(GAME_HEIGHT - 24, Math.round(y))),
+        };
+    });
+    level.controlPoints = level.waypoints.map(p => ({ ...p }));
+    level.routeOptions = { cornerRadius: 52 + (level.id % 3) * 6, sampleSpacing: 8 };
+    // Authored foreground silhouettes sit at the lower battlefield edge and
+    // are intentionally rendered after actors. Alternating placement keeps
+    // entrances and objectives visible while giving every biome real depth.
+    const left = level.id % 2 === 0;
+    level.foreground = [
+        { type: level.theme.includes("swamp") || level.theme.includes("marsh") ? "reeds" : "rock",
+          x: left ? 92 : 808, y: 526, w: 150 + (level.id % 3) * 18, h: 58, color: level.bgColor },
+        { type: "instrument", x: left ? 846 : 54, y: 518, w: 86, h: 72, color: level.accentColor }
+    ];
+});
+
 class LevelManager {
+    static drawForeground(ctx, level) {
+        (level.foreground || []).forEach(mask => {
+            ctx.save();
+            if (mask.type === "reeds") {
+                ctx.strokeStyle = mask.color || "#173a25";
+                ctx.lineWidth = 7;
+                for (let i = -4; i <= 4; i++) {
+                    const x = mask.x + i * (mask.w / 10);
+                    ctx.beginPath();
+                    ctx.moveTo(x, GAME_HEIGHT + 8);
+                    ctx.quadraticCurveTo(x + i * 2, mask.y - mask.h * (0.5 + (Math.abs(i) % 3) * 0.16), x + 4, mask.y);
+                    ctx.stroke();
+                }
+            } else if (mask.type === "instrument") {
+                ctx.fillStyle = "rgba(7,17,14,.94)";
+                ctx.strokeStyle = mask.color || "#c49a53";
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.ellipse(mask.x, mask.y, mask.w * 0.46, mask.h * 0.42, -0.15, 0, Math.PI * 2);
+                ctx.fill(); ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(mask.x, mask.y); ctx.lineTo(mask.x + mask.w * 0.28, mask.y - mask.h * 0.58);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = mask.color || "#182820";
+                ctx.strokeStyle = "rgba(228,195,115,.28)";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.ellipse(mask.x, mask.y, mask.w * 0.52, mask.h * 0.58, -0.08, Math.PI, Math.PI * 2);
+                ctx.lineTo(mask.x + mask.w * 0.52, GAME_HEIGHT + 8);
+                ctx.lineTo(mask.x - mask.w * 0.52, GAME_HEIGHT + 8);
+                ctx.closePath(); ctx.fill(); ctx.stroke();
+            }
+            ctx.restore();
+        });
+    }
+
     static drawScenery(ctx, level) {
         if (!level.scenery) return;
 
@@ -1032,7 +1109,8 @@ class LevelManager {
     }
 
     static drawPath(ctx, path, pathColor, accentColor) {
-        if (!path || path.length < 2) return;
+        const isRoute = path && typeof path.trace === "function";
+        if (!path || (!isRoute && path.length < 2)) return;
 
         // The road is fully static per level, so render it once to an
         // offscreen canvas (keyed by the level's waypoint array — startLevel
@@ -1040,8 +1118,10 @@ class LevelManager {
         // This both saves per-frame stroke work and makes richer layering free.
         if (!LevelManager._pathCache) LevelManager._pathCache = new WeakMap();
         let cached = LevelManager._pathCache.get(path);
-        const w = ctx.canvas ? ctx.canvas.width : 0;
-        const h = ctx.canvas ? ctx.canvas.height : 0;
+        // Cache in logical pixels. The destination context owns DPR scaling;
+        // caching at its physical dimensions would double-scale the road.
+        const w = GAME_WIDTH;
+        const h = GAME_HEIGHT;
         const canCache = w > 0 && typeof document !== "undefined" && !!document.createElement;
 
         if (!cached && canCache) {
@@ -1069,11 +1149,14 @@ class LevelManager {
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         const trace = () => {
-            ctx.beginPath();
-            path.forEach((wp, index) => {
-                if (index === 0) ctx.moveTo(wp.x, wp.y);
-                else ctx.lineTo(wp.x, wp.y);
-            });
+            if (path && typeof path.trace === "function") path.trace(ctx);
+            else {
+                ctx.beginPath();
+                path.forEach((wp, index) => {
+                    if (index === 0) ctx.moveTo(wp.x, wp.y);
+                    else ctx.lineTo(wp.x, wp.y);
+                });
+            }
         };
         trace();
 
