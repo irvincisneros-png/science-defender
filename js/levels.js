@@ -4,6 +4,34 @@
 const GAME_WIDTH = 900;
 const GAME_HEIGHT = 550;
 
+// Each painted battlefield gets its own road material. The previous renderer
+// put the same near-black strip over every biome, which made even the strongest
+// background paintings feel disconnected from play. These palettes deliberately
+// borrow the local ground colour, then reserve the bright level accent for tiny
+// pieces of edge wear instead of a game-board centre line.
+const PATH_MATERIALS = {
+    lab:          { body: "#3c4858", worn: "#526071", shoulder: "#172431", edge: "#7b93a1", detail: "#65d7dc", texture: "plates", asset: "path_surface_lab" },
+    swamp:        { body: "#50613c", worn: "#66744a", shoulder: "#172317", edge: "#263b20", detail: "#86a85b", texture: "moss", asset: "path_surface_organic" },
+    volcanic:     { body: "#432d25", worn: "#594036", shoulder: "#1b0d09", edge: "#21120f", detail: "#ff7b2f", texture: "cracks", asset: "path_surface_basalt" },
+    tundra:       { body: "#9ab3c1", worn: "#b8cbd2", shoulder: "#425d6f", edge: "#d8e9ed", detail: "#f2fbff", texture: "ice", asset: "path_surface_frost" },
+    observatory:  { body: "#6d6976", worn: "#88828b", shoulder: "#2e2639", edge: "#c6ad72", detail: "#f2d477", texture: "inlay", asset: "path_surface_cosmic" },
+    alchemy:      { body: "#8c7453", worn: "#aa9169", shoulder: "#3f2c1b", edge: "#c4a66b", detail: "#e9c56e", texture: "pavers", asset: "path_surface_academy" },
+    aether:       { body: "#746e9a", worn: "#9189b4", shoulder: "#32294c", edge: "#b3a8db", detail: "#d7c9ff", texture: "crystal", asset: "path_surface_cosmic" },
+    marsh:        { body: "#46553a", worn: "#5d6848", shoulder: "#172319", edge: "#273a25", detail: "#8ea66a", texture: "moss", asset: "path_surface_organic" },
+    tectonic:     { body: "#8a6745", worn: "#a47b50", shoulder: "#49301c", edge: "#5a3b23", detail: "#d69d58", texture: "cracks", asset: "path_surface_basalt" },
+    forge:        { body: "#46352d", worn: "#5d4639", shoulder: "#1c100d", edge: "#241612", detail: "#ed7441", texture: "plates", asset: "path_surface_academy" },
+    cavern:       { body: "#365268", worn: "#476b82", shoulder: "#102735", edge: "#1b3d4d", detail: "#62bfd0", texture: "crystal", asset: "path_surface_frost" },
+    storm:        { body: "#4a525b", worn: "#626d73", shoulder: "#1b242b", edge: "#2e3b43", detail: "#c6c68b", texture: "pavers", asset: "path_surface_frost" },
+    toxic:        { body: "#59604a", worn: "#717760", shoulder: "#252b1d", edge: "#343c28", detail: "#9fbc55", texture: "cracks", asset: "path_surface_organic" },
+    stellar:      { body: "#34334f", worn: "#484766", shoulder: "#17142c", edge: "#272243", detail: "#ba94d0", texture: "stardust", asset: "path_surface_cosmic" },
+    twin_spires:  { body: "#594d5a", worn: "#706270", shoulder: "#291d2b", edge: "#35273a", detail: "#be718f", texture: "pavers", asset: "path_surface_academy" },
+    ocean:        { body: "#39768a", worn: "#4d8da0", shoulder: "#123747", edge: "#1e5263", detail: "#82d2da", texture: "ripple", asset: "path_surface_frost" },
+    magnetic:     { body: "#493c63", worn: "#605076", shoulder: "#211832", edge: "#332443", detail: "#cf6fa9", texture: "inlay", asset: "path_surface_cosmic" },
+    radiation:    { body: "#697044", worn: "#808653", shoulder: "#30351d", edge: "#444b29", detail: "#afc95a", texture: "cracks", asset: "path_surface_organic" },
+    singularity:  { body: "#3b2858", worn: "#51386d", shoulder: "#160d28", edge: "#29173f", detail: "#a55ac2", texture: "stardust", asset: "path_surface_cosmic" },
+    heat_death:   { body: "#2d2531", worn: "#403343", shoulder: "#100b14", edge: "#211726", detail: "#a4593d", texture: "cracks", asset: "path_surface_basalt" },
+};
+
 const LEVEL_DATA = [
     // ===================== LEVEL 1: THE LAB =====================
     {
@@ -962,6 +990,7 @@ LEVEL_DATA.forEach(level => {
     });
     level.controlPoints = level.waypoints.map(p => ({ ...p }));
     level.routeOptions = { cornerRadius: 52 + (level.id % 3) * 6, sampleSpacing: 8 };
+    level.pathMaterial = { ...PATH_MATERIALS[level.theme] };
     // Authored foreground silhouettes sit at the lower battlefield edge and
     // are intentionally rendered after actors. Alternating placement keeps
     // entrances and objectives visible while giving every biome real depth.
@@ -1185,9 +1214,15 @@ class LevelManager {
         }
     }
 
-    // Layered road paint: dark edging → packed-earth body → worn centre →
-    // soft inner sheen → dashed accent line. Drawn once into the path cache.
+    // Layered biome road: a terrain-coloured shoulder sinks the route into the
+    // painting, while sparse material marks sell steel, snow, mud, basalt, etc.
+    // Drawn once into the path cache, so the richer treatment remains free.
     static _renderPathLayers(ctx, path, pathColor, accentColor) {
+        const level = LEVEL_DATA.find(candidate => candidate.pathColor === pathColor);
+        const material = (level && level.pathMaterial) || {
+            body: pathColor, worn: "rgba(255,255,255,.08)", shoulder: "rgba(12,8,20,.55)",
+            edge: "rgba(0,0,0,.24)", detail: accentColor, texture: "pavers"
+        };
         ctx.save();
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -1203,38 +1238,106 @@ class LevelManager {
         };
         trace();
 
-        // dark outer edging grounds the road against the painted background
-        ctx.strokeStyle = "rgba(12, 8, 20, 0.55)";
-        ctx.lineWidth = 42;
+        // A broad translucent soil/stone shoulder is the important integration
+        // layer: hard black outlines were what made the old road feel pasted on.
+        ctx.globalAlpha = .72;
+        ctx.strokeStyle = material.shoulder;
+        ctx.lineWidth = 52;
         ctx.stroke();
 
-        // main packed-earth body
-        ctx.strokeStyle = pathColor;
-        ctx.lineWidth = 36;
+        ctx.globalAlpha = .86;
+        ctx.strokeStyle = material.edge;
+        ctx.lineWidth = 43;
         ctx.stroke();
 
-        // worn centre track, slightly lighter
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-        ctx.lineWidth = 22;
+        ctx.globalAlpha = .94;
+        ctx.strokeStyle = material.body;
+        ctx.lineWidth = 38;
         ctx.stroke();
 
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-        ctx.lineWidth = 32;
+        // Image Gen surface grain is deliberately subdued beneath the unique
+        // biome palette. It adds real painted material detail without turning
+        // the road into a high-contrast texture strip or obscuring enemies.
+        const surface = typeof window !== "undefined" && window.spriteAssets && material.asset
+            ? window.spriteAssets[material.asset] : null;
+        if (surface && surface.complete && surface.naturalWidth > 0 && ctx.createPattern) {
+            const pattern = ctx.createPattern(surface, "repeat");
+            if (pattern) {
+                ctx.globalAlpha = .22;
+                ctx.strokeStyle = pattern;
+                ctx.lineWidth = 35;
+                ctx.stroke();
+            }
+        }
+
+        ctx.globalAlpha = .3;
+        ctx.strokeStyle = material.worn;
+        ctx.lineWidth = 24;
         ctx.stroke();
 
-        // cobble texture: short accent ticks along the road
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
-        ctx.lineWidth = 30;
-        ctx.setLineDash([2, 26]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // centre accent dashes (the original guide line, slightly brighter)
-        ctx.strokeStyle = accentColor + "33";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 12]);
-        ctx.stroke();
+        ctx.globalAlpha = 1;
+        LevelManager._drawPathTexture(ctx, path, material);
         ctx.restore();
+    }
+
+    static _drawPathTexture(ctx, path, material) {
+        const samples = path && Array.isArray(path.samples) ? path.samples : [];
+        if (!samples.length) return;
+        const step = material.texture === "moss" ? 9 : 12;
+        ctx.lineCap = "round";
+        for (let i = step; i < samples.length - step; i += step) {
+            const p = samples[i];
+            const before = samples[Math.max(0, i - 2)];
+            const after = samples[Math.min(samples.length - 1, i + 2)];
+            const angle = Math.atan2(after.y - before.y, after.x - before.x);
+            const nx = -Math.sin(angle), ny = Math.cos(angle);
+            // Deterministic offsets avoid animated shimmer and keep cache output
+            // stable across runs without introducing a seeded random dependency.
+            const side = ((i / step) % 2 ? 1 : -1);
+            const offset = side * (12 + ((i * 7) % 5));
+            const x = p.x + nx * offset, y = p.y + ny * offset;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle + ((i % 3) - 1) * .12);
+            ctx.strokeStyle = material.detail;
+            ctx.fillStyle = material.detail;
+            ctx.globalAlpha = material.texture === "stardust" ? .34 : .25;
+            ctx.lineWidth = 1.4;
+            if (material.texture === "moss") {
+                ctx.beginPath();
+                ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+                ctx.arc(side * 4, 2, 1.4, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (material.texture === "cracks") {
+                ctx.beginPath();
+                ctx.moveTo(-5, 0); ctx.lineTo(-1, 2); ctx.lineTo(3, -2); ctx.lineTo(6, 1);
+                ctx.moveTo(-1, 2); ctx.lineTo(0, 5);
+                ctx.stroke();
+            } else if (material.texture === "ice") {
+                ctx.beginPath();
+                ctx.moveTo(-6, 2); ctx.lineTo(0, -2); ctx.lineTo(6, 1);
+                ctx.stroke();
+            } else if (material.texture === "crystal" || material.texture === "stardust") {
+                ctx.beginPath();
+                ctx.moveTo(0, -3); ctx.lineTo(2, 0); ctx.lineTo(0, 3); ctx.lineTo(-2, 0); ctx.closePath();
+                ctx.fill();
+            } else if (material.texture === "ripple") {
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 6, 2, 0, 0, Math.PI * 2);
+                ctx.stroke();
+            } else {
+                // Paver joints, metal plate seams and brass inlay all read as a
+                // quiet cross-road seam at gameplay scale.
+                ctx.beginPath();
+                ctx.moveTo(0, -8); ctx.lineTo(0, 8);
+                ctx.stroke();
+                if (material.texture === "plates") {
+                    ctx.beginPath(); ctx.arc(0, -7, 1.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(0, 7, 1.2, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+            ctx.restore();
+        }
     }
 
     // Ominous rift where enemies pour onto the map — marks the spawn direction.

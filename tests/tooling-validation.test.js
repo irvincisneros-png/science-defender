@@ -2,6 +2,7 @@
 "use strict";
 
 const assert = require("assert");
+const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
@@ -17,7 +18,10 @@ assert(report.totalBytes > 50 * 1024 * 1024, "asset byte total unexpectedly smal
 assert(report.byExtension.png.files >= 80, "PNG inventory unexpectedly small");
 assert.strictEqual(report.errors.length, 0, report.errors.join("\n"));
 assert.strictEqual(report.warnings.length, 0, report.warnings.join("\n"));
-assert.strictEqual(report.byExtension.webp.files, 20, "expected one WebP delivery painting per campaign level");
+const levelWebps = fs.readdirSync(path.join(root, "assets/levels")).filter(file => file.endsWith(".webp"));
+const pathWebps = fs.readdirSync(path.join(root, "assets/paths")).filter(file => file.endsWith(".webp"));
+assert.strictEqual(levelWebps.length, 20, "expected one WebP delivery painting per campaign level");
+assert.strictEqual(pathWebps.length, 6, "expected six generated path material families");
 assert(report.runtimeReferences > 5, "runtime reference scan did not find expected assets");
 assert(report.largest.every((entry) => entry.bytes > 0), "largest-file report contains empty assets");
 

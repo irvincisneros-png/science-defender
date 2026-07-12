@@ -123,6 +123,12 @@
 
                 <div style="position:relative; flex: 1; display:flex; align-items:center; justify-content:center;">
                     <canvas id="game-canvas" tabindex="0" aria-label="Science Defender battlefield. Select a tower in the Field Kit, then use arrow keys to choose a build pad and Enter to place it."></canvas>
+
+                    <div id="placement-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+                        <span class="placement-status-dot" aria-hidden="true"></span>
+                        <span id="placement-status-text">Choose a build pad</span>
+                        <span class="placement-status-key" aria-hidden="true">Esc to cancel</span>
+                    </div>
                     
                     <!-- Notification logger overlay -->
                     <div id="hud-log" role="status" aria-live="polite">Objective: Place towers and defend the portal!</div>
@@ -436,22 +442,7 @@
 
         // Active shop selection
         function selectTowerForPlacement(type, btnElement) {
-            // Uncheck other buttons
-            document.querySelectorAll(".shop-btn").forEach(b => b.classList.remove("active"));
-            
-            if (game.selectedTowerType === type) {
-                game.selectedTowerType = null; // deselect
-            } else {
-                game.selectedTowerType = type;
-                btnElement.classList.add("active");
-                game.keyboardPadIndex = 0;
-                const firstPad = (game.level && game.level.buildSpots || []).find(p => !p.occupied);
-                if (firstPad) { game.mouseX = firstPad.x; game.mouseY = firstPad.y; }
-                game.showInGameNotification(`Placement armed: tap a glowing pad, or focus the battlefield and use arrow keys then Enter.`);
-                if (game.canvas && game.canvas.focus) {
-                    requestAnimationFrame(() => game.canvas.focus({ preventScroll: true }));
-                }
-            }
+            game.armTowerPlacement(type, btnElement);
         }
 
         // Configure the active revision question pool from the Year + Topic dropdowns.

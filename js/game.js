@@ -129,6 +129,14 @@ window.SHEET_META = {};
     LEVEL_THEMES.forEach((theme, id) => {
         ASSETS_MANIFEST[`bg_level_${id}`] = `assets/levels/${theme}.webp`;
     });
+    Object.assign(ASSETS_MANIFEST, {
+        path_surface_lab: "assets/paths/lab_plating.webp",
+        path_surface_organic: "assets/paths/organic_earth.webp",
+        path_surface_basalt: "assets/paths/volcanic_basalt.webp",
+        path_surface_frost: "assets/paths/frost_flagstone.webp",
+        path_surface_cosmic: "assets/paths/cosmic_inlay.webp",
+        path_surface_academy: "assets/paths/academy_pavers.webp",
+    });
 })();
 if (typeof window !== "undefined") window.ASSETS_MANIFEST = ASSETS_MANIFEST;
 
@@ -188,7 +196,10 @@ class Game {
         
         this.level = null; // Current level object
         this.isEndless = false;
-        this.PATH_CLEARANCE = 34; // min px from path centerline for a build pad
+        this.PATH_CLEARANCE = 48; // road shoulder + full visible foundation footprint
+        this.PAD_HIT_RADIUS = 58; // generous pointer/touch snap target in game pixels
+        this.PAD_MIN_SPACING = 64; // prevents overlapping tower footprints
+        this.PAD_ENDPOINT_CLEARANCE = 92;
         this.gameClock = new GameClock(60);
         this.reducedMotionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
         this.reducedMotion = !!this.reducedMotionQuery.matches;
@@ -277,6 +288,7 @@ class Game {
         this.mouseX = 0;
         this.mouseY = 0;
         this.keyboardPadIndex = 0;
+        this.activeBuildPad = null;
 
         // Asset Loader Preloading System
         window.spriteAssets = window.spriteAssets || {};
@@ -285,6 +297,8 @@ class Game {
         // Keeping them out of the eager set avoids decoding all 20 backgrounds
         // on mobile before the player has chosen a map.
         this.coreAssetKeys = ["bg_menu", "battle_spawn_rift", "battle_empirical_core",
+            "path_surface_lab", "path_surface_organic", "path_surface_basalt",
+            "path_surface_frost", "path_surface_cosmic", "path_surface_academy",
             "proj_flask", "proj_spore", "proj_bullet", "proj_gravity"];
         this.totalAssetsCount = this.coreAssetKeys.length;
         this.assetsLoaded = false;
@@ -337,6 +351,11 @@ class Game {
             const img = new Image();
             const finish = loaded => {
                 if (loaded) window.spriteAssets[key] = img;
+                if (loaded && key.startsWith("path_surface_") && typeof LevelManager !== "undefined") {
+                    // A frame may have cached the palette-only fallback while
+                    // this compact texture was loading. Rebuild it once with grain.
+                    LevelManager._pathCache = new WeakMap();
+                }
                 if (countTowardsCore) {
                     this.loadedAssetsCount++;
                     if (this.loadedAssetsCount >= this.totalAssetsCount) {
@@ -395,6 +414,11 @@ class Game {
             if (keep.has(key)) return;
             const img = window.spriteAssets[key];
             if (img) {
+                // Detaching a successfully loaded image is not a load failure.
+                // Clear its callbacks before blanking src so rapid campaign-map
+                // previews do not emit a wall of false "Sprite not found" warnings.
+                img.onload = null;
+                img.onerror = null;
                 try { img.src = ""; } catch (e) {}
                 delete window.spriteAssets[key];
             }
@@ -551,16 +575,6 @@ class Game {
         this.level.route = new PathGeometry(controls, this.level.routeOptions || {});
         this.level.waypoints = this.level.route.controlPoints;
 
-        // Drop any authored build pad that overlaps the road, so a tower can
-        // never be placed on the path. Clearance = path half-width (18) + pad
-        // footprint (16). Placement also re-checks (see placeTower).
-        if (this.level.buildSpots) {
-            const before = this.level.buildSpots.length;
-            this.level.buildSpots = this.level.buildSpots.filter(s => !this.isNearPath(s.x, s.y, this.PATH_CLEARANCE));
-            const dropped = before - this.level.buildSpots.length;
-            if (dropped > 0) console.warn(`Level ${levelIndex}: removed ${dropped} build pad(s) overlapping the path.`);
-        }
-
         // Spawn portal (where enemies emerge) and the defended base (path end),
         // clamped just inside the canvas from the off-screen first/last waypoints.
         const wps = this.level.waypoints || [];
@@ -571,15 +585,7 @@ class Game {
         });
         this.level._spawnPoint = wps.length ? clampIn(wps[0]) : null;
         this.level._basePoint = wps.length ? clampIn(wps[wps.length - 1]) : null;
-        if (this.level.buildSpots) {
-            const endpointClearance = 84;
-            this.level.buildSpots = this.level.buildSpots.filter(spot => {
-                const clearOf = point => !point || Math.hypot(spot.x - point.x, spot.y - point.y) >= endpointClearance;
-                const insideActorSafeFrame = spot.x >= 64 && spot.x <= GAME_WIDTH - 64 &&
-                    spot.y >= 82 && spot.y <= GAME_HEIGHT - 48;
-                return insideActorSafeFrame && clearOf(this.level._spawnPoint) && clearOf(this.level._basePoint);
-            });
-        }
+        this.sanitizeBuildSpots(levelIndex);
         this.baseHitAt = 0; // timestamp of last base impact (for the hit flash)
 
         // Apply permanent (meta) upgrades for this run.
@@ -611,6 +617,7 @@ class Game {
         this.isTargetingSkill = false;
         this.targetingHeroIndex = -1;
         this._cryoUntil = 0;
+        this.cancelTowerPlacement(false);
         if (this.canvas) this.canvas.style.cursor = "default";
         const qModal = document.getElementById("question-modal");
         if (qModal) qModal.style.display = "none";
@@ -663,6 +670,12 @@ class Game {
             this.mouseX = (e.clientX - rect.left) * (GAME_WIDTH / rect.width);
             this.mouseY = (e.clientY - rect.top) * (GAME_HEIGHT / rect.height);
 
+            if (this.selectedTowerType) {
+                const placement = this.getTowerPlacementState(this.mouseX, this.mouseY);
+                this.activeBuildPad = placement.nearPad;
+                this.updatePlacementStatus(placement);
+            }
+
             // Update hover flags for towers
             this.towers.forEach(t => {
                 t.isHovered = Math.hypot(t.x - this.mouseX, t.y - this.mouseY) < 26;
@@ -682,24 +695,21 @@ class Game {
             if (tag === "INPUT" || tag === "TEXTAREA") return;
             if (e.key === "Escape") {
                 this.cancelSkillTargeting();
-                this.selectedTowerType = null;
-                document.querySelectorAll(".shop-btn").forEach(btn => btn.classList.remove("active"));
+                this.cancelTowerPlacement();
                 return;
             }
             if (document.activeElement === this.canvas && this.selectedTowerType) {
                 const pads = (this.level && this.level.buildSpots || []).filter(p => !p.occupied);
                 if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key) && pads.length) {
                     e.preventDefault();
-                    const delta = (e.key === "ArrowLeft" || e.key === "ArrowUp") ? -1 : 1;
-                    this.keyboardPadIndex = (this.keyboardPadIndex + delta + pads.length) % pads.length;
-                    this.mouseX = pads[this.keyboardPadIndex].x;
-                    this.mouseY = pads[this.keyboardPadIndex].y;
-                    this.showInGameNotification(`Build pad ${this.keyboardPadIndex + 1} of ${pads.length}. Press Enter to place.`);
+                    const current = this.activeBuildPad && !this.activeBuildPad.occupied ? this.activeBuildPad : pads[0];
+                    const pad = this.findDirectionalPad(current, e.key, pads);
+                    this.selectBuildPad(pad, true);
                     return;
                 }
                 if ((e.key === "Enter" || e.key === " ") && pads.length) {
                     e.preventDefault();
-                    const pad = pads[this.keyboardPadIndex % pads.length];
+                    const pad = this.activeBuildPad && !this.activeBuildPad.occupied ? this.activeBuildPad : pads[0];
                     this.placeTower(pad.x, pad.y);
                     return;
                 }
@@ -766,7 +776,14 @@ class Game {
                 return;
             }
 
-            // 3. Check if clicking a Hero to select (dead heroes can't be selected)
+            // 3. Placement owns battlefield taps while armed. This prevents a
+            // hero or existing tower standing over a pad from stealing the tap.
+            if (this.selectedTowerType) {
+                this.placeTower(clickX, clickY);
+                return;
+            }
+
+            // 4. Check if clicking a Hero to select (dead heroes can't be selected)
             let heroClicked = null;
             this.heroes.forEach(h => {
                 if (!h.isDead && Math.hypot(h.x - clickX, h.y - clickY) < 28) { // selection tolerance
@@ -784,7 +801,7 @@ class Game {
                 return;
             }
 
-            // 4. Check if clicking an existing Tower
+            // 5. Check if clicking an existing Tower
             let towerClicked = null;
             this.towers.forEach(t => {
                 if (Math.hypot(t.x - clickX, t.y - clickY) < 30) { // selection tolerance
@@ -801,13 +818,6 @@ class Game {
                 }
                 this.updateSidebarUI();
                 this.showTowerUpgradeMenu(towerClicked);
-                return;
-            }
-
-            // 5. Check if placing a Tower (Priority: place tower even if a hero is selected!)
-            if (this.selectedTowerType) {
-                console.log(`Placing tower: ${this.selectedTowerType}`);
-                this.placeTower(clickX, clickY);
                 return;
             }
 
@@ -830,14 +840,14 @@ class Game {
     }
 
     placeTower(clickX, clickY) {
+        const placement = this.getTowerPlacementState(clickX, clickY);
         // Respect progressive unlocks.
         if (this.unlocks && !this.unlocks.towers.includes(this.selectedTowerType)) {
             this.particleSystem.addFloatingText(clickX, clickY, "Unlocks in a later level!", "#ff2222", 13);
             return;
         }
         // Cost map (data-driven with legacy fallback)
-        const costs = window.TOWER_COSTS || { physics: 100, chemistry: 120, biology: 80, astronomy: 160 };
-        const cost = costs[this.selectedTowerType];
+        const cost = placement.cost;
 
         if (this.gold < cost) {
             this.particleSystem.addFloatingText(clickX, clickY, "Insufficient Gold!", "#ff2222", 13);
@@ -846,14 +856,19 @@ class Game {
 
         // Placement limit: at most MAX_PER_TYPE of any one tower type per map,
         // so a single dominant tower can't be spammed to cover everything.
-        const sameType = this.towers.filter(t => t.type === this.selectedTowerType).length;
+        const sameType = placement.sameType;
         if (sameType >= this.MAX_PER_TYPE) {
             this.particleSystem.addFloatingText(clickX, clickY, `Max ${this.MAX_PER_TYPE} ${this.selectedTowerType} towers!`, "#ff2222", 13);
             return;
         }
 
         // Realm Defense-style fixed pads: snap to the nearest free build spot.
-        const pad = this.findFreePadNear(clickX, clickY, 45);
+        if (placement.nearPad && placement.nearPad.occupied) {
+            this.particleSystem.addFloatingText(placement.nearPad.x, placement.nearPad.y, "Station occupied", "#ffb65c", 13);
+            this.showInGameNotification("That foundation is occupied. Choose another glowing pad.");
+            return;
+        }
+        const pad = placement.pad;
         if (!pad) {
             this.particleSystem.addFloatingText(clickX, clickY, "Build on a glowing pad!", "#ff2222", 13);
             return;
@@ -888,8 +903,7 @@ class Game {
         this.particleSystem.addFloatingText(x, y, `-${cost} Gold`, "#ffd700", 12);
 
         // Reset slot selection
-        this.selectedTowerType = null;
-        document.querySelectorAll(".shop-btn").forEach(b => b.classList.remove("active"));
+        this.cancelTowerPlacement(false);
         this.showInGameNotification(`${tower.name} established. Select another station or start the wave.`);
         this.updateSidebarUI();
     }
@@ -907,16 +921,161 @@ class Game {
         });
     }
 
-    // Returns the nearest unoccupied build spot within maxDist, or null.
-    findFreePadNear(x, y, maxDist) {
+    sanitizeBuildSpots(levelIndex = "?") {
+        if (!this.level || !Array.isArray(this.level.buildSpots)) return;
+        const accepted = [];
+        const safe = spot => {
+            const clearOf = point => !point || Math.hypot(spot.x - point.x, spot.y - point.y) >= this.PAD_ENDPOINT_CLEARANCE;
+            return Number.isFinite(spot.x) && Number.isFinite(spot.y) &&
+                spot.x >= 68 && spot.x <= GAME_WIDTH - 68 && spot.y >= 82 && spot.y <= GAME_HEIGHT - 54 &&
+                !this.isNearPath(spot.x, spot.y, this.PATH_CLEARANCE) &&
+                clearOf(this.level._spawnPoint) && clearOf(this.level._basePoint) &&
+                accepted.every(other => Math.hypot(spot.x - other.x, spot.y - other.y) >= this.PAD_MIN_SPACING);
+        };
+        const before = this.level.buildSpots.length;
+        this.level.buildSpots.forEach((spot, authoredIndex) => {
+            if (!safe(spot)) return;
+            spot.occupied = !!spot.occupied;
+            spot.authoredIndex = authoredIndex;
+            accepted.push(spot);
+        });
+        // Older authored maps occasionally lose too many foundations once the
+        // curved route and larger endpoint art are considered. Top up from a
+        // deterministic staggered field grid, preferring useful near-route
+        // positions while respecting every collision rule above.
+        const minimumPlayablePads = 8;
+        if (accepted.length < minimumPlayablePads) {
+            const candidates = [];
+            [105, 170, 235, 330, 395, 460].forEach((y, row) => {
+                for (let x = 105 + (row % 2) * 42; x <= 795; x += 86) {
+                    const candidate = { x, y, occupied: false, generated: true, authoredIndex: -1 };
+                    const nearest = this.level.route && this.level.route.nearestPoint ? this.level.route.nearestPoint(x, y) : null;
+                    const separation = nearest ? nearest.separation : 100;
+                    candidates.push({ candidate, score: Math.abs(separation - 82) });
+                }
+            });
+            candidates.sort((a, b) => a.score - b.score || a.candidate.y - b.candidate.y || a.candidate.x - b.candidate.x);
+            for (const { candidate } of candidates) {
+                if (accepted.length >= minimumPlayablePads) break;
+                if (safe(candidate)) accepted.push(candidate);
+            }
+        }
+        this.level.buildSpots = accepted;
+        const removed = before - accepted.filter(s => !s.generated).length;
+        const generated = accepted.filter(s => s.generated).length;
+        if (removed || generated) console.info(`Level ${levelIndex}: removed ${removed} unsafe pad(s); generated ${generated} safe replacement(s).`);
+    }
+
+    getTowerPlacementState(x = this.mouseX, y = this.mouseY) {
+        const type = this.selectedTowerType;
+        const costs = window.TOWER_COSTS || { physics: 100, chemistry: 120, biology: 80, astronomy: 160, volcano: 140, barracks: 110 };
+        const cost = costs[type] || 0;
+        const sameType = type ? this.towers.filter(t => t.type === type).length : 0;
+        const nearPad = this.findPadNear(x, y, this.PAD_HIT_RADIUS, true);
+        const pad = nearPad && !nearPad.occupied ? nearPad : null;
+        let reason = "Choose a glowing foundation";
+        if (!type) reason = "Select a research station";
+        else if (this.unlocks && !this.unlocks.towers.includes(type)) reason = "Unlocks in a later level";
+        else if (this.gold < cost) reason = `Need ${cost - this.gold} more gold`;
+        else if (sameType >= this.MAX_PER_TYPE) reason = `Maximum ${this.MAX_PER_TYPE} already built`;
+        else if (nearPad && nearPad.occupied) reason = "Foundation occupied";
+        else if (!pad) reason = "Move onto a glowing foundation";
+        else reason = "Ready to build";
+        const valid = !!(type && pad && this.gold >= cost && sameType < this.MAX_PER_TYPE &&
+            (!this.unlocks || this.unlocks.towers.includes(type)) && !this.isNearPath(pad.x, pad.y, this.PATH_CLEARANCE));
+        return { type, cost, sameType, nearPad, pad, valid, reason };
+    }
+
+    findPadNear(x, y, maxDist = this.PAD_HIT_RADIUS, includeOccupied = false) {
         if (!this.level || !this.level.buildSpots) return null;
         let best = null, bestD = maxDist;
         this.level.buildSpots.forEach(s => {
-            if (s.occupied) return;
+            if (!includeOccupied && s.occupied) return;
             const d = Math.hypot(s.x - x, s.y - y);
-            if (d < bestD) { bestD = d; best = s; }
+            if (d <= bestD) { bestD = d; best = s; }
         });
         return best;
+    }
+
+    // Returns the nearest unoccupied build spot within maxDist, or null.
+    findFreePadNear(x, y, maxDist) {
+        return this.findPadNear(x, y, maxDist, false);
+    }
+
+    findDirectionalPad(origin, key, pads) {
+        if (!origin || !pads.length) return pads[0] || null;
+        const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
+        if (!direction) return origin;
+        const candidates = pads.filter(p => p !== origin).map(p => {
+            const dx = p.x - origin.x, dy = p.y - origin.y;
+            const forward = dx * direction[0] + dy * direction[1];
+            const lateral = Math.abs(dx * direction[1] - dy * direction[0]);
+            return { p, forward, score: forward + lateral * 1.65 };
+        }).filter(c => c.forward > 8).sort((a, b) => a.score - b.score);
+        return candidates.length ? candidates[0].p : origin;
+    }
+
+    selectBuildPad(pad, announce = false) {
+        if (!pad) return;
+        this.activeBuildPad = pad;
+        this.mouseX = pad.x;
+        this.mouseY = pad.y;
+        const pads = (this.level && this.level.buildSpots || []).filter(p => !p.occupied);
+        this.keyboardPadIndex = Math.max(0, pads.indexOf(pad));
+        this.updatePlacementStatus();
+        if (announce) this.showInGameNotification(`Foundation ${this.keyboardPadIndex + 1} of ${pads.length}. Press Enter to build.`);
+    }
+
+    armTowerPlacement(type, btnElement) {
+        if (this.selectedTowerType === type) { this.cancelTowerPlacement(); return; }
+        this.cancelSkillTargeting();
+        this.selectedTowerType = type;
+        document.querySelectorAll(".shop-btn").forEach(b => b.classList.toggle("active", b === btnElement));
+        const pads = (this.level && this.level.buildSpots || []).filter(p => !p.occupied);
+        this.selectBuildPad(pads[0] || null);
+        if (this.canvas && this.canvas.classList) this.canvas.classList.add("placement-armed");
+        this.updatePlacementStatus();
+        this.syncShopPlacementUI();
+        this.showInGameNotification("Placement armed — tap a foundation, or use arrow keys and Enter.");
+        if (this.canvas && this.canvas.focus) requestAnimationFrame(() => this.canvas.focus({ preventScroll: true }));
+    }
+
+    cancelTowerPlacement(announce = true) {
+        const wasArmed = !!this.selectedTowerType;
+        this.selectedTowerType = null;
+        this.activeBuildPad = null;
+        document.querySelectorAll(".shop-btn").forEach(btn => btn.classList.remove("active"));
+        if (this.canvas && this.canvas.classList) this.canvas.classList.remove("placement-armed");
+        this.updatePlacementStatus();
+        this.syncShopPlacementUI();
+        if (announce && wasArmed) this.showInGameNotification("Placement cancelled.");
+    }
+
+    updatePlacementStatus(state = this.getTowerPlacementState()) {
+        const status = document.getElementById("placement-status");
+        const text = document.getElementById("placement-status-text");
+        if (!status || !text) return;
+        status.hidden = !this.selectedTowerType;
+        status.classList.toggle("is-valid", !!state.valid);
+        status.classList.toggle("is-invalid", !state.valid);
+        const label = this.selectedTowerType ? this.selectedTowerType.charAt(0).toUpperCase() + this.selectedTowerType.slice(1) : "";
+        text.textContent = this.selectedTowerType ? `${label} · ${state.cost}G · ${state.reason}` : "";
+    }
+
+    syncShopPlacementUI() {
+        const costs = window.TOWER_COSTS || {};
+        document.querySelectorAll(".shop-btn[data-tower]").forEach(btn => {
+            const type = btn.getAttribute("data-tower");
+            const count = this.towers.filter(t => t.type === type).length;
+            const unaffordable = Number.isFinite(costs[type]) && this.gold < costs[type];
+            const atLimit = count >= this.MAX_PER_TYPE;
+            btn.classList.toggle("unaffordable", unaffordable);
+            btn.classList.toggle("at-limit", atLimit);
+            btn.setAttribute("aria-disabled", unaffordable || atLimit ? "true" : "false");
+            const cost = Number.isFinite(costs[type]) ? costs[type] : "?";
+            const detail = atLimit ? `maximum ${this.MAX_PER_TYPE} built` : unaffordable ? `need ${cost} gold, currently ${this.gold}` : `costs ${cost} gold`;
+            btn.setAttribute("aria-label", `Place ${type} tower, ${detail}`);
+        });
     }
 
     isNearPath(x, y, minDistance) {
@@ -1375,31 +1534,42 @@ class Game {
                 }
             }
 
-            // Draw build pads. A dark backing disc keeps them readable over the
-            // painted level backgrounds; brighter green ring while placing.
+            // Draw every foundation, including occupied ones, so the battlefield
+            // always communicates its build topology. Placement mode brightens
+            // free pads and gives the pointer/keyboard target a focused beacon.
             if (this.level.buildSpots) {
                 const active = !!this.selectedTowerType;
+                const placement = active ? this.getTowerPlacementState() : null;
                 const r = 22;
                 this.level.buildSpots.forEach(s => {
-                    if (s.occupied) return;
+                    const focused = active && placement && placement.nearPad === s;
+                    const blocked = !!s.occupied;
+                    const canAfford = !placement || (this.gold >= placement.cost && placement.sameType < this.MAX_PER_TYPE);
+                    const pulse = focused && !this.reducedMotion ? 1 + Math.sin(performance.now() / 180) * 0.08 : 1;
                     this.ctx.save();
-                    // Raised stone-and-brass emplacement rather than a debug marker.
-                    this.ctx.fillStyle = "rgba(5, 12, 18, 0.52)";
+                    this.ctx.fillStyle = "rgba(5, 12, 18, 0.6)";
                     this.ctx.beginPath();
-                    this.ctx.ellipse(s.x, s.y + 5, r + 3, r * 0.6, 0, 0, Math.PI * 2);
+                    this.ctx.ellipse(s.x, s.y + 6, r + 4, r * 0.63, 0, 0, Math.PI * 2);
                     this.ctx.fill();
                     const padGradient = this.ctx.createRadialGradient(s.x - 6, s.y - 7, 2, s.x, s.y, r);
-                    padGradient.addColorStop(0, active ? "rgba(93, 137, 120, 0.94)" : "rgba(103, 113, 112, 0.9)");
-                    padGradient.addColorStop(0.58, "rgba(42, 53, 58, 0.94)");
+                    padGradient.addColorStop(0, blocked ? "rgba(55, 66, 66, 0.92)" : active ? "rgba(104, 159, 132, 0.96)" : "rgba(103, 113, 112, 0.9)");
+                    padGradient.addColorStop(0.58, blocked ? "rgba(31, 39, 41, 0.95)" : "rgba(42, 53, 58, 0.94)");
                     padGradient.addColorStop(1, "rgba(18, 25, 29, 0.98)");
                     this.ctx.fillStyle = padGradient;
                     this.ctx.beginPath();
-                    this.ctx.ellipse(s.x, s.y, r, r * 0.62, 0, 0, Math.PI * 2);
+                    this.ctx.ellipse(s.x, s.y, r * pulse, r * 0.62 * pulse, 0, 0, Math.PI * 2);
                     this.ctx.fill();
-                    this.ctx.strokeStyle = active ? "rgba(84, 255, 183, 0.98)" : "rgba(215, 177, 94, 0.78)";
-                    this.ctx.lineWidth = active ? 3 : 2;
+                    this.ctx.strokeStyle = blocked ? "rgba(126, 139, 135, 0.48)" :
+                        focused ? (placement.valid ? "rgba(113, 255, 194, 1)" : "rgba(255, 139, 100, 1)") :
+                        active ? (canAfford ? "rgba(84, 255, 183, 0.88)" : "rgba(171, 151, 116, 0.55)") : "rgba(215, 177, 94, 0.78)";
+                    this.ctx.lineWidth = focused ? 4 : active ? 2.5 : 2;
+                    if (focused) {
+                        this.ctx.shadowColor = placement.valid ? "rgba(84,255,183,.9)" : "rgba(255,110,80,.8)";
+                        this.ctx.shadowBlur = 14;
+                    }
                     this.ctx.stroke();
-                    this.ctx.strokeStyle = active ? "rgba(190, 255, 224, 0.88)" : "rgba(238, 205, 132, 0.48)";
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.strokeStyle = blocked ? "rgba(126,139,135,.25)" : active ? "rgba(190, 255, 224, 0.82)" : "rgba(238, 205, 132, 0.48)";
                     this.ctx.lineWidth = 1.5;
                     for (let i = 0; i < 6; i++) {
                         const a = i * Math.PI / 3;
@@ -1407,6 +1577,12 @@ class Game {
                         this.ctx.moveTo(s.x + Math.cos(a) * 13, s.y + Math.sin(a) * 8);
                         this.ctx.lineTo(s.x + Math.cos(a) * 18, s.y + Math.sin(a) * 11);
                         this.ctx.stroke();
+                    }
+                    if (blocked) {
+                        this.ctx.fillStyle = "rgba(212,220,214,.55)";
+                        this.ctx.font = "bold 12px 'Nunito', sans-serif";
+                        this.ctx.textAlign = "center";
+                        this.ctx.fillText("●", s.x, s.y + 4);
                     }
                     this.ctx.restore();
                 });
@@ -1518,32 +1694,54 @@ class Game {
                 this.ctx.restore();
             });
 
-            // Draw ghost tower placing feedback (snaps to the nearest free pad)
+            // Draw a production-art tower ghost at the snapped foundation. The
+            // range, ground footprint and status color preview the real result.
             if (this.selectedTowerType) {
                 const ranges = window.TOWER_BASE_RANGE || { physics: 135, chemistry: 160, biology: 120, astronomy: 150 };
                 const range = ranges[this.selectedTowerType] || 140;
                 const colors = window.TOWER_COLORS || { physics: "#00ffff", chemistry: "#ff6600", biology: "#00ff66", astronomy: "#bf55ec" };
-
-                const pad = this.findFreePadNear(this.mouseX, this.mouseY, 45);
+                const placement = this.getTowerPlacementState();
+                const pad = placement.nearPad;
                 const tx = pad ? pad.x : this.mouseX;
                 const ty = pad ? pad.y : this.mouseY;
-                const ok = !!pad;
+                const ok = placement.valid;
 
                 // Range indicator
-                this.ctx.fillStyle = ok ? "rgba(0, 255, 150, 0.06)" : "rgba(255, 0, 0, 0.05)";
+                this.ctx.save();
+                this.ctx.fillStyle = ok ? "rgba(62, 231, 166, 0.09)" : "rgba(239, 91, 72, 0.08)";
                 this.ctx.beginPath();
                 this.ctx.arc(tx, ty, range, 0, Math.PI * 2);
                 this.ctx.fill();
 
-                this.ctx.strokeStyle = ok ? "rgba(0, 255, 150, 0.5)" : "rgba(255, 0, 0, 0.4)";
-                this.ctx.lineWidth = 1.5;
+                this.ctx.strokeStyle = ok ? "rgba(99, 255, 195, 0.75)" : "rgba(255, 116, 91, 0.7)";
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([8, 6]);
                 this.ctx.beginPath();
                 this.ctx.arc(tx, ty, range, 0, Math.PI * 2);
                 this.ctx.stroke();
+                this.ctx.setLineDash([]);
 
-                // Tower template box
-                this.ctx.fillStyle = colors[this.selectedTowerType] + (ok ? "cc" : "55");
-                this.ctx.fillRect(tx - 12, ty - 12, 24, 24);
+                this.ctx.globalAlpha = ok ? 0.78 : 0.42;
+                this.ctx.filter = ok ? "none" : "grayscale(.45)";
+                this.ctx.shadowColor = ok ? colors[this.selectedTowerType] : "#ff5f50";
+                this.ctx.shadowBlur = 14;
+                const drawn = window.drawSprite(this.ctx, `tower_${this.selectedTowerType}_1`, "idle", tx - 48, ty - 69, 96, 96);
+                if (!drawn) {
+                    this.ctx.fillStyle = colors[this.selectedTowerType] || "#8fd";
+                    this.ctx.beginPath(); this.ctx.arc(tx, ty - 12, 22, 0, Math.PI * 2); this.ctx.fill();
+                }
+                this.ctx.globalAlpha = 1;
+                this.ctx.filter = "none";
+                this.ctx.shadowBlur = 0;
+                this.ctx.fillStyle = ok ? "rgba(7,34,27,.9)" : "rgba(55,18,17,.92)";
+                this.ctx.strokeStyle = ok ? "#71ffc2" : "#ff8b72";
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath(); this.ctx.roundRect(tx - 46, ty + 26, 92, 22, 8); this.ctx.fill(); this.ctx.stroke();
+                this.ctx.fillStyle = "#fff8e9";
+                this.ctx.font = "bold 11px 'Nunito', sans-serif";
+                this.ctx.textAlign = "center";
+                this.ctx.fillText(ok ? `BUILD · ${placement.cost}G` : placement.reason.toUpperCase(), tx, ty + 41, 84);
+                this.ctx.restore();
             }
 
             // Skill-aim overlay — unmistakable feedback that the game is waiting
@@ -1684,6 +1882,8 @@ class Game {
         this.hudRef("ui-lives").textContent = this.lives;
         this.hudRef("ui-rp").textContent = this.researchPoints;
         this.hudRef("ui-wave").textContent = this.isEndless ? `${this.waveNumber} (Endless)` : `${this.waveNumber}/${this.level ? this.level.waves.length : 5}`;
+        this.syncShopPlacementUI();
+        if (this.selectedTowerType) this.updatePlacementStatus();
 
         // Update wave start / call-wave button text
         this.refreshWaveButton();
