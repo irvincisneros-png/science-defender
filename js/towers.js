@@ -444,56 +444,36 @@ class Tower {
     }
 
     findTargets(enemies) {
-        const inRange = enemies.filter(e => {
-            if (e.isDead) return false;
-            if (e.flying && !this.canHitAir) return false; // ground-only towers ignore flyers
-            const dist = Math.hypot(e.x - this.x, e.y - this.y);
-            return dist <= this.range;
-        });
+        const routeProgress = e => Number.isFinite(e.pathDistance)
+            ? e.pathDistance
+            : (e.currentWaypointIndex || 0);
+        const rangeSq = this.range * this.range;
+        let best = null;
+        let bestMetric = 0;
+        let bestTie = 0;
+        const mode = this.prioritizeFar ? "first" : this.targetMode;
 
-        if (inRange.length === 0) return [];
+        // One pass, squared distance, no candidate array and no O(E log E)
+        // sort. This runs once per firing tower and dominates busy-wave scans.
+        for (const e of enemies) {
+            if (!e || e.isDead || e.reachedEnd || (e.flying && !this.canHitAir)) continue;
+            const dx = e.x - this.x, dy = e.y - this.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq > rangeSq) continue;
+            if (window.SCI_PERF) window.SCI_PERF.targetCandidates = (window.SCI_PERF.targetCandidates || 0) + 1;
 
-        // TASK B: if prioritizeFar is set, target furthest-along / highest-HP enemy
-        if (this.prioritizeFar) {
-            inRange.sort((a, b) => {
-                // Primary: furthest along path (highest waypointIndex)
-                if (a.currentWaypointIndex !== b.currentWaypointIndex) {
-                    return b.currentWaypointIndex - a.currentWaypointIndex;
-                }
-                // Secondary: highest HP (tanks/bosses)
-                return b.health - a.health;
-            });
-            return [inRange[0]];
+            let metric;
+            if (mode === "first") metric = routeProgress(e);
+            else if (mode === "last") metric = -routeProgress(e);
+            else if (mode === "strongest") metric = e.health;
+            else if (mode === "weakest") metric = -e.health;
+            else metric = -distSq; // closest
+            const tie = this.prioritizeFar ? e.health : routeProgress(e);
+            if (!best || metric > bestMetric || (metric === bestMetric && tie > bestTie)) {
+                best = e; bestMetric = metric; bestTie = tie;
+            }
         }
-
-        if (this.targetMode === "first") {
-            inRange.sort((a, b) => {
-                if (a.currentWaypointIndex !== b.currentWaypointIndex) {
-                    return b.currentWaypointIndex - a.currentWaypointIndex;
-                }
-                const targetA = a.waypoints[a.currentWaypointIndex];
-                const targetB = b.waypoints[b.currentWaypointIndex];
-                if (!targetA || !targetB) return 0;
-                const distA = Math.hypot(a.x - targetA.x, a.y - targetA.y);
-                const distB = Math.hypot(b.x - targetB.x, b.y - targetB.y);
-                return distA - distB;
-            });
-        }
-        else if (this.targetMode === "strongest") {
-            inRange.sort((a, b) => b.health - a.health);
-        }
-        else if (this.targetMode === "weakest") {
-            inRange.sort((a, b) => a.health - b.health);
-        }
-        else if (this.targetMode === "closest") {
-            inRange.sort((a, b) => {
-                const distA = Math.hypot(a.x - this.x, a.y - this.y);
-                const distB = Math.hypot(b.x - this.x, b.y - this.y);
-                return distA - distB;
-            });
-        }
-
-        return [inRange[0]];
+        return best ? [best] : [];
     }
 
     fire(targets, projectiles, particleSystem, enemies) {
@@ -1592,6 +1572,13 @@ class BarracksTower extends Tower {
     // ─── Compute the rally point: point on path nearest this tower ──────────
     _computeRallyPoint() {
         const inst = (typeof window !== "undefined") && window.gameInstance;
+        const route = inst && inst.level && inst.level.route;
+        if (route && typeof route.nearestPoint === "function") {
+            const nearest = route.nearestPoint(this.x, this.y);
+            this._rallyPoint = nearest ? { x: nearest.x, y: nearest.y, pathDistance: nearest.distance } : { x: this.x, y: this.y };
+            this._rallyReady = true;
+            return;
+        }
         const waypoints = inst && inst.level && inst.level.waypoints;
         if (!waypoints || waypoints.length < 2) {
             // Fallback: rally directly at tower position
@@ -1649,6 +1636,7 @@ class BarracksTower extends Tower {
         if (this.branch === "a") {
             minion.blockLimit = 5;
         }
+        minion.spriteBase = "hero_fieldteam";
         return minion;
     }
 
@@ -1744,11 +1732,15 @@ class BarracksTower extends Tower {
         ctx.fill();
         ctx.restore();
 
-        // Vector art
+        // Production Field Team station art with procedural fallback.
         ctx.save();
         ctx.strokeStyle = "#1b1424";
         ctx.lineWidth = 2.5;
-        this.drawCartoonVector(ctx);
+        const tier = this.level === 4 ? "4" : this.level === 3 ? "3" : "1";
+        if (!window.drawSprite(ctx, `tower_barracks_${tier}`, "idle",
+                this.x - this.size/2, this.y - this.size/2, this.size, this.size, 0)) {
+            this.drawCartoonVector(ctx);
+        }
 
         // Star label
         ctx.save();

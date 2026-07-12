@@ -5,6 +5,45 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-07-12 — Full campaign visual overhaul complete
+
+- Added DPR-aware 900×550 logical rendering, fixed-tick interpolation, foreground occlusion,
+  selected-roster staging/release, HUD throttling, and single-pass squared-distance targeting.
+- Rebuilt campaign cards with painting thumbnails, biome/roster previews, difficulty, stars and boss state.
+- Added modal focus trapping/restoration, keyboard pad placement, persistent non-color trait badges,
+  reduced-motion canvas behavior, and setup/between-wave quiz gating.
+- Generated and validated the complete campaign roster: 17 regular enemy sheets, five boss sheets,
+  Volcano, Barracks/Field Team, and blocker troop raster assets using the approved art bible.
+- Re-authored every route with blended diagonal controls and broad organic curves, then verified
+  all 20 compositions and their build-pad coverage in a rendered contact sheet.
+- Replaced remaining production-HUD emoji with one original outlined SVG icon family.
+- Added 20 WebP level paintings with PNG fallback, recompressed oversized audio, corrected image
+  extensions, removed the stale sprite guide, and brought strict asset audit debt to zero.
+- Expanded automation to 68/68 regression checks, exact regular/boss sprite QA, per-level route coverage,
+  Field Kit/tower/wave/traversal/focus/DPR/reduced-motion browser checks, and busiest-wave captures.
+
+See `docs/completion-audit-2026-07-12.md` for the completed requirement-by-requirement proof.
+
+## 2026-07-11 — Curved-route engine and responsive visual overhaul
+
+- Added a canonical sampled `PathGeometry` with quadratic corner fillets, arc-length movement,
+  headings, progress, nearest-route queries, and cached curved road rendering. All 20 campaign
+  routes now contain real diagonal controls and curved transitions.
+- Migrated enemy travel, First/Last targeting, split-enemy continuity, build clearance, and
+  Barracks rallying to the same route contract.
+- Added a fixed 60 Hz accumulator so 60 Hz and 120 Hz displays run identical simulation speed.
+- Rebuilt the shell around an original Illustrated Science Expedition visual system: brass,
+  enamel, paper, accessible semantic controls, responsive level screens, and a collapsible
+  iPhone-landscape Field Kit.
+- Added pointer-based battlefield interaction, y/foot-point actor depth sorting, and on-demand
+  loading for the selected level painting instead of eagerly decoding all 20 backgrounds.
+- Added the Level 1 enemy concept reference and art bible, plus asset auditing, desktop/mobile
+  browser smoke testing, and route/timing regression coverage.
+
+**Verified:** 62/62 regression checks, tooling validation, asset audit with 0 errors, desktop
+1280×720 and iPhone landscape 844×390 browser smoke tests, touch tower placement, mobile Field
+Kit open/close behavior, and zero browser console errors.
+
 ## 2026-06-12 — Batch 5 projectile sprites generated + wired (84/84 assets complete)
 
 Claude drove the Antigravity desktop app (computer control) to execute Batch 5 of

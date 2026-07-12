@@ -32,6 +32,8 @@ function makeEl(id) {
     set textContent(v) { this._text = v; },
     get textContent() { return this._text; },
     addEventListener() {},
+    setAttribute(name, value) { this[name] = value; },
+    focus() { if (globalThis.document) globalThis.document.activeElement = this; },
     appendChild() {},
     querySelector() { return makeEl("child"); },
     querySelectorAll() { return []; },
@@ -46,6 +48,8 @@ const SCREEN_IDS = ["screen-menu", "screen-levelselect", "screen-playing",
 SCREEN_IDS.forEach((id) => { const e = makeEl(id); e._classes.add("screen"); elements.set(id, e); });
 
 globalThis.document = {
+  activeElement: null,
+  contains() { return true; },
   getElementById(id) {
     if (!elements.has(id)) elements.set(id, makeEl(id));
     return elements.get(id);
@@ -82,7 +86,7 @@ globalThis.loadDefaultQuestionsIntoCreator = () => {}; // referenced by switchSc
 const FILES = [
   "js/audio.js",
   "js/questions-y7.js", "js/questions-y8.js", "js/questions-y9.js", "js/questions-y10.js",
-  "js/questions.js", "js/particles.js", "js/levels.js",
+  "js/questions.js", "js/particles.js", "js/path-geometry.js", "js/levels.js",
   "js/enemies.js", "js/towers.js", "js/heroes.js", "js/game.js"];
 
 const results = [];
@@ -964,6 +968,131 @@ check("triggerDefeat closes question/pause modals and cancels aim modes", () => 
   if (document.getElementById("pause-modal").style.display !== "none")
     throw new Error("pause modal must close on defeat");
   if (g.isTargetingItem) throw new Error("aim mode must cancel on defeat");
+});
+
+// ===========================================================================
+// 2026-07 visual overhaul foundation: canonical curved routes + fixed clock.
+// ===========================================================================
+
+check("PathGeometry preserves endpoints and produces finite monotonic samples", () => {
+  const controls = [{ x: 0, y: 40 }, { x: 100, y: 40 }, { x: 180, y: 120 }, { x: 300, y: 80 }];
+  const route = new globalThis.PathGeometry(controls, { cornerRadius: 30, sampleSpacing: 7 });
+  const first = route.samples[0], last = route.samples[route.samples.length - 1];
+  if (Math.hypot(first.x, first.y - 40) > 0.001) throw new Error("route start moved");
+  if (Math.hypot(last.x - 300, last.y - 80) > 0.001) throw new Error("route end moved");
+  for (let i = 0; i < route.samples.length; i++) {
+    const s = route.samples[i];
+    if (![s.x, s.y, s.distance, s.angle, s.progress].every(Number.isFinite)) throw new Error("non-finite route sample");
+    if (i && s.distance < route.samples[i - 1].distance) throw new Error("route distance went backwards");
+  }
+});
+
+check("distance-based enemy movement stays on the canonical curve at constant speed", () => {
+  const route = new globalThis.PathGeometry([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 180, y: 100 }, { x: 400, y: 100 }]);
+  const e = new globalThis.FlatEarthEnemy(0, 0, 1);
+  e.setPath(route);
+  const speed = e.baseSpeed;
+  for (let i = 0; i < 80; i++) e.update(null, [e]);
+  if (Math.abs(e.pathDistance - speed * 80) > 0.01) throw new Error("distance does not match speed × ticks");
+  const nearest = route.nearestPoint(e.x, e.y);
+  if (!nearest || nearest.separation > 0.01) throw new Error("enemy left the rendered route centreline");
+});
+
+check("First and Last targeting use route distance through curves", () => {
+  const t = new globalThis.PhysicsTower(100, 100);
+  const behind = { x: 100, y: 100, health: 10, isDead: false, flying: false, pathDistance: 20 };
+  const ahead = { x: 105, y: 100, health: 10, isDead: false, flying: false, pathDistance: 200 };
+  t.targetMode = "first";
+  if (t.findTargets([behind, ahead])[0] !== ahead) throw new Error("First did not select greatest route distance");
+  t.targetMode = "last";
+  if (t.findTargets([behind, ahead])[0] !== behind) throw new Error("Last did not select least route distance");
+});
+
+check("all campaign routes contain diagonal controls and generated curves", () => {
+  for (const level of globalThis.LEVEL_DATA) {
+    const points = level.controlPoints || level.waypoints;
+    const meaningfulDiagonals = points.filter((p, i) => {
+      if (!i) return false;
+      const dx = Math.abs(p.x - points[i - 1].x), dy = Math.abs(p.y - points[i - 1].y);
+      if (!dx || !dy) return false;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      return angle >= 15 && angle <= 75;
+    }).length;
+    const route = new globalThis.PathGeometry(points, level.routeOptions);
+    const curved = route.commands.some(c => c.type === "quadratic");
+    if (meaningfulDiagonals < 4 || !curved) throw new Error(`level ${level.id} lacks purposeful diagonal travel/curves`);
+  }
+});
+
+check("all campaign enemies and bosses use validated v2 production candidates", () => {
+  const regular = ["flatearth", "phlogiston", "spontaneous", "maggot", "alchemy", "perpetual", "geocentric", "miasma", "caloric", "aether", "vitalism", "humours", "creationist", "homunculus", "homunculus_core", "golem", "golem_molten"];
+  const bosses = ["boss_geo", "boss_phlog", "boss_aether", "boss_miasma", "boss_entropy"];
+  for (const key of [...regular, ...bosses]) {
+    const path = globalThis.ASSETS_MANIFEST[`enemy_${key}_walk`];
+    if (path !== `assets/enemies/candidates/${key}_walk_v2.png`) throw new Error(`${key} still uses legacy art: ${path}`);
+    if (!fs.existsSync(J(path))) throw new Error(`${key} candidate is missing`);
+  }
+});
+
+check("GameClock advances 60 simulation ticks at both 60 Hz and 120 Hz", () => {
+  const run = refresh => {
+    const clock = new globalThis.GameClock(60);
+    let ticks = 0;
+    clock.advance(0, () => ticks++);
+    for (let i = 1; i <= refresh; i++) clock.advance(i * 1000 / refresh, () => ticks++);
+    return ticks;
+  };
+  const at60 = run(60), at120 = run(120);
+  if (at60 !== 60 || at120 !== 60) throw new Error(`tick mismatch: 60Hz=${at60}, 120Hz=${at120}`);
+});
+
+check("DPR backing stays crisp while logical coordinates remain 900x550", () => {
+  const g = new globalThis.Game();
+  g.configureCanvasBacking(2);
+  if (g.canvas.width !== 1800 || g.canvas.height !== 1100) throw new Error(`${g.canvas.width}x${g.canvas.height}`);
+  if (g.canvas.style.aspectRatio !== "900 / 550") throw new Error("logical aspect changed");
+});
+
+check("render interpolation blends previous and current fixed-tick poses", () => {
+  const g = new globalThis.Game();
+  const actor = { previousX: 10, previousY: 30, x: 30, y: 70 };
+  if (g.interpolatedCoordinate(actor, "x", 0.25) !== 15) throw new Error("x interpolation wrong");
+  if (g.interpolatedCoordinate(actor, "y", 0.5) !== 50) throw new Error("y interpolation wrong");
+});
+
+check("selected-level staging excludes unrelated enemy sheets and releases superseded art", () => {
+  const g = new globalThis.Game();
+  const keys = g.getLevelAssetKeys(0);
+  if (!keys.includes("enemy_flatearth_walk") || !keys.includes("enemy_maggot_walk")) throw new Error("level roster incomplete");
+  if (keys.includes("enemy_boss_entropy_walk") || keys.includes("enemy_alchemy_walk")) throw new Error("unrelated enemy eagerly staged");
+  const lateKeys = g.getLevelAssetKeys(19);
+  if (!lateKeys.includes("tower_volcano_4_attack") || !lateKeys.includes("tower_barracks_4_idle") || !lateKeys.includes("hero_fieldteam_walk")) throw new Error("late tower/blocker art missing from staged set");
+  let released = false;
+  globalThis.spriteAssets.enemy_alchemy_walk = { set src(v) { if (v === "") released = true; } };
+  g._levelAssetKeys = ["enemy_alchemy_walk"];
+  g.releaseLevelAssets(keys);
+  if (!released || globalThis.spriteAssets.enemy_alchemy_walk) throw new Error("superseded image retained");
+});
+
+check("every level declares foreground occluders rendered in a post-actor pass", () => {
+  if (globalThis.LEVEL_DATA.some(level => !Array.isArray(level.foreground) || !level.foreground.length)) throw new Error("missing foreground data");
+  if (typeof globalThis.LevelManager.drawForeground !== "function") throw new Error("foreground renderer missing");
+  const gameSource = fs.readFileSync(J("js/game.js"), "utf8");
+  if (gameSource.indexOf("particleSystem.draw") > gameSource.indexOf("LevelManager.drawForeground")) throw new Error("foreground is not post-actor");
+});
+
+check("target selection uses one-pass squared-distance semantics", () => {
+  globalThis.SCI_PERF = { targetCandidates: 0 };
+  const t = new globalThis.PhysicsTower(0, 0);
+  t.range = 50;
+  const near = { x: 3, y: 4, health: 10, isDead: false, flying: false, pathDistance: 1 };
+  const farAlong = { x: 20, y: 0, health: 20, isDead: false, flying: false, pathDistance: 9 };
+  t.targetMode = "first";
+  if (t.findTargets([near, farAlong])[0] !== farAlong) throw new Error("first semantics changed");
+  t.targetMode = "closest";
+  if (t.findTargets([near, farAlong])[0] !== near) throw new Error("closest semantics changed");
+  if (globalThis.SCI_PERF.targetCandidates !== 4) throw new Error("candidate instrumentation missing");
+  globalThis.SCI_PERF = null;
 });
 
 // ---- Report ---------------------------------------------------------------
