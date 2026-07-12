@@ -11,7 +11,10 @@ class Enemy {
         this.health = maxHealth;
         this.goldReward = goldReward;
         this.rpReward = rpReward;
-        this.size = size * 1.5; // boost visual cartoon sizes slightly
+        // Generated sheets contain generous transparent padding; a larger
+        // presentation multiplier keeps silhouettes legible in active waves.
+        // Movement speed, health and path collision remain unchanged.
+        this.size = size * 1.8;
         this.color = color;
         this.name = name;
 

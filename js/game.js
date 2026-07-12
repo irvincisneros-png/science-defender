@@ -29,6 +29,8 @@ const uiIconMarkup = name => `<svg class="ui-icon" aria-hidden="true"><use href=
 const ASSETS_MANIFEST = {
     // UI/Backgrounds
     "bg_menu": "assets/ui/fantasy_bg.jpg",
+    "battle_spawn_rift": "assets/ui/spawn_rift.png",
+    "battle_empirical_core": "assets/ui/empirical_core.png",
 
     // Projectiles (Batch 5, generated 2026-06-12) — static images;
     // Projectile.draw() spins them and adds the motion trail in code.
@@ -69,7 +71,7 @@ window.SHEET_META = {};
     TOWERS.forEach(t => TIERS.forEach(tier => Object.entries(TOWER_STATES).forEach(([state, cfg]) => {
         const key = `tower_${t}_${tier}_${state}`;
         ASSETS_MANIFEST[key] = `assets/towers/${t}_${tier}_${state}.png`;
-        window.SHEET_META[key] = { frameW: 64, frameH: 64, ...cfg };
+        window.SHEET_META[key] = { frameW: 128, frameH: 128, ...cfg };
     })));
     ASSETS_MANIFEST.hero_fieldteam_walk = "assets/heroes/fieldteam_walk.png";
     window.SHEET_META.hero_fieldteam_walk = { frameW: 64, frameH: 64, cols: 6, fps: 9, loop: true };
@@ -282,7 +284,8 @@ class Game {
         // Large per-level paintings are loaded only when a level is selected.
         // Keeping them out of the eager set avoids decoding all 20 backgrounds
         // on mobile before the player has chosen a map.
-        this.coreAssetKeys = ["bg_menu", "proj_flask", "proj_spore", "proj_bullet", "proj_gravity"];
+        this.coreAssetKeys = ["bg_menu", "battle_spawn_rift", "battle_empirical_core",
+            "proj_flask", "proj_spore", "proj_bullet", "proj_gravity"];
         this.totalAssetsCount = this.coreAssetKeys.length;
         this.assetsLoaded = false;
 
@@ -514,12 +517,12 @@ class Game {
 
     // Progressive unlocks: which towers are buildable, how high they can be
     // upgraded, and whether specialization is allowed — a function of the level
-    // reached. Levels 1–3 are deliberately restricted (2 towers, 1 upgrade) so
-    // the player can't trivially over-build; the roster + tiers open up after.
+    // reached. Levels 1–3 teach the three core damage roles with one upgrade;
+    // the specialist roster + tiers open up after.
     getLevelUnlocks(idx) {
         const all = ["physics", "biology", "chemistry", "astronomy", "volcano", "barracks"];
         if (this.isEndless) return { towers: all, maxLevel: 3, spec: true };
-        if (idx <= 2)  return { towers: ["physics", "biology"], maxLevel: 2, spec: false };
+        if (idx <= 2)  return { towers: ["physics", "biology", "chemistry"], maxLevel: 2, spec: false };
         if (idx === 3) return { towers: ["physics", "biology", "chemistry"], maxLevel: 3, spec: true };
         if (idx === 4) return { towers: ["physics", "biology", "chemistry", "astronomy"], maxLevel: 3, spec: true };
         if (idx === 5) return { towers: ["physics", "biology", "chemistry", "astronomy", "volcano"], maxLevel: 3, spec: true };
@@ -561,13 +564,22 @@ class Game {
         // Spawn portal (where enemies emerge) and the defended base (path end),
         // clamped just inside the canvas from the off-screen first/last waypoints.
         const wps = this.level.waypoints || [];
-        const m = 30; // inset so the structure sits fully on-screen
+        const m = 58; // inset so the illustrated endpoint structures remain on-screen
         const clampIn = p => ({
             x: Math.min(Math.max(p.x, m), GAME_WIDTH - m),
             y: Math.min(Math.max(p.y, m), GAME_HEIGHT - m),
         });
         this.level._spawnPoint = wps.length ? clampIn(wps[0]) : null;
         this.level._basePoint = wps.length ? clampIn(wps[wps.length - 1]) : null;
+        if (this.level.buildSpots) {
+            const endpointClearance = 84;
+            this.level.buildSpots = this.level.buildSpots.filter(spot => {
+                const clearOf = point => !point || Math.hypot(spot.x - point.x, spot.y - point.y) >= endpointClearance;
+                const insideActorSafeFrame = spot.x >= 64 && spot.x <= GAME_WIDTH - 64 &&
+                    spot.y >= 82 && spot.y <= GAME_HEIGHT - 48;
+                return insideActorSafeFrame && clearOf(this.level._spawnPoint) && clearOf(this.level._basePoint);
+            });
+        }
         this.baseHitAt = 0; // timestamp of last base impact (for the hit flash)
 
         // Apply permanent (meta) upgrades for this run.
@@ -878,6 +890,7 @@ class Game {
         // Reset slot selection
         this.selectedTowerType = null;
         document.querySelectorAll(".shop-btn").forEach(b => b.classList.remove("active"));
+        this.showInGameNotification(`${tower.name} established. Select another station or start the wave.`);
         this.updateSidebarUI();
     }
 
@@ -1053,7 +1066,9 @@ class Game {
         const lateHp = (!this.isEndless && id >= this.LATE_RAMP_START_ID)
             ? Math.min(this.LATE_HP_CAP, (id - (this.LATE_RAMP_START_ID - 1)) * this.LATE_HP_PER_LEVEL * (isBossType ? 0.5 : 1))
             : 0;
-        const scale = this.isEndless
+        const scale = (!this.isEndless && id === 0)
+            ? 0.35 + Math.max(0, this.waveNumber - 1) * 0.06
+            : this.isEndless
             ? 1.0 + (this.waveNumber * 0.14)
             : 1.0 + (this.level.id * 0.28) + ((this.waveNumber - 1) * 0.07) + lateHp;
 
@@ -1140,7 +1155,10 @@ class Game {
 
         // Between-wave countdown: auto-starts the next wave when it elapses.
         if (!this.isWaveActive && this.nextWaveCountdown > 0) {
-            this.nextWaveCountdown--;
+            // Keep the setup window honest in wall-clock time. The simulation
+            // ticks twice as often at 2×, so compensate here instead of turning
+            // the advertised 12-second planning break into six real seconds.
+            this.nextWaveCountdown -= 1 / Math.max(1, this.gameSpeed || 1);
             this.refreshWaveButton();
             if (this.nextWaveCountdown <= 0) {
                 this.startNextWave();
@@ -1318,42 +1336,78 @@ class Game {
             // top of the road so it reads as the source/destination; enemies draw
             // over them so they appear to pour out / batter the base.
             if (this.level._spawnPoint) {
-                LevelManager.drawSpawnPortal(this.ctx, this.level._spawnPoint);
+                const img = window.spriteAssets && window.spriteAssets.battle_spawn_rift;
+                if (img && img.complete && img.naturalWidth > 0) {
+                    const p = this.level._spawnPoint;
+                    const pulse = 1 + Math.sin(performance.now() / 420) * 0.025;
+                    const size = 118 * pulse;
+                    this.ctx.save();
+                    this.ctx.shadowColor = "rgba(225, 60, 255, 0.72)";
+                    this.ctx.shadowBlur = 18;
+                    this.ctx.drawImage(img, p.x - size / 2, p.y - size * 0.58, size, size);
+                    this.ctx.restore();
+                } else {
+                    LevelManager.drawSpawnPortal(this.ctx, this.level._spawnPoint);
+                }
             }
             if (this.level._basePoint) {
                 const ratio = Math.max(0, this.lives / (this.maxLives || 1));
                 const flash = Math.max(0, 1 - (performance.now() - (this.baseHitAt || 0)) / 320);
-                LevelManager.drawBase(this.ctx, this.level._basePoint, ratio, this.level.accentColor, flash);
+                const img = window.spriteAssets && window.spriteAssets.battle_empirical_core;
+                if (img && img.complete && img.naturalWidth > 0) {
+                    const p = this.level._basePoint;
+                    const size = 122 + flash * 7;
+                    this.ctx.save();
+                    this.ctx.globalAlpha = 0.82 + ratio * 0.18;
+                    this.ctx.shadowColor = flash > 0 ? "rgba(255, 100, 80, 0.95)" : "rgba(40, 225, 255, 0.65)";
+                    this.ctx.shadowBlur = 16 + flash * 18;
+                    this.ctx.drawImage(img, p.x - size / 2, p.y - size * 0.58, size, size);
+                    this.ctx.restore();
+                    const barW = 76, barY = p.y - 64;
+                    this.ctx.save();
+                    this.ctx.fillStyle = "rgba(7, 18, 24, 0.82)";
+                    this.ctx.fillRect(p.x - barW / 2 - 2, barY - 2, barW + 4, 9);
+                    this.ctx.fillStyle = ratio > 0.45 ? "#55e6b7" : ratio > 0.2 ? "#f4c95d" : "#ef6f61";
+                    this.ctx.fillRect(p.x - barW / 2, barY, barW * ratio, 5);
+                    this.ctx.restore();
+                } else {
+                    LevelManager.drawBase(this.ctx, this.level._basePoint, ratio, this.level.accentColor, flash);
+                }
             }
 
             // Draw build pads. A dark backing disc keeps them readable over the
             // painted level backgrounds; brighter green ring while placing.
             if (this.level.buildSpots) {
                 const active = !!this.selectedTowerType;
-                const r = 20;
+                const r = 22;
                 this.level.buildSpots.forEach(s => {
                     if (s.occupied) return;
                     this.ctx.save();
-                    // dark contrast backing
-                    this.ctx.fillStyle = active ? "rgba(0,40,20,0.45)" : "rgba(0,0,0,0.38)";
+                    // Raised stone-and-brass emplacement rather than a debug marker.
+                    this.ctx.fillStyle = "rgba(5, 12, 18, 0.52)";
                     this.ctx.beginPath();
-                    this.ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+                    this.ctx.ellipse(s.x, s.y + 5, r + 3, r * 0.6, 0, 0, Math.PI * 2);
                     this.ctx.fill();
-                    // dashed ring
-                    this.ctx.strokeStyle = active ? "rgba(60,255,150,0.95)" : "rgba(255,255,255,0.5)";
+                    const padGradient = this.ctx.createRadialGradient(s.x - 6, s.y - 7, 2, s.x, s.y, r);
+                    padGradient.addColorStop(0, active ? "rgba(93, 137, 120, 0.94)" : "rgba(103, 113, 112, 0.9)");
+                    padGradient.addColorStop(0.58, "rgba(42, 53, 58, 0.94)");
+                    padGradient.addColorStop(1, "rgba(18, 25, 29, 0.98)");
+                    this.ctx.fillStyle = padGradient;
+                    this.ctx.beginPath();
+                    this.ctx.ellipse(s.x, s.y, r, r * 0.62, 0, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = active ? "rgba(84, 255, 183, 0.98)" : "rgba(215, 177, 94, 0.78)";
                     this.ctx.lineWidth = active ? 3 : 2;
-                    this.ctx.setLineDash([5, 4]);
-                    this.ctx.beginPath();
-                    this.ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
                     this.ctx.stroke();
-                    // centre marker (small plus) so empty pads read as buildable
-                    this.ctx.setLineDash([]);
-                    this.ctx.strokeStyle = active ? "rgba(120,255,190,0.9)" : "rgba(255,255,255,0.6)";
-                    this.ctx.lineWidth = 2;
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(s.x - 5, s.y); this.ctx.lineTo(s.x + 5, s.y);
-                    this.ctx.moveTo(s.x, s.y - 5); this.ctx.lineTo(s.x, s.y + 5);
-                    this.ctx.stroke();
+                    this.ctx.strokeStyle = active ? "rgba(190, 255, 224, 0.88)" : "rgba(238, 205, 132, 0.48)";
+                    this.ctx.lineWidth = 1.5;
+                    for (let i = 0; i < 6; i++) {
+                        const a = i * Math.PI / 3;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(s.x + Math.cos(a) * 13, s.y + Math.sin(a) * 8);
+                        this.ctx.lineTo(s.x + Math.cos(a) * 18, s.y + Math.sin(a) * 11);
+                        this.ctx.stroke();
+                    }
                     this.ctx.restore();
                 });
             }
@@ -1641,6 +1695,9 @@ class Game {
         this.heroes.forEach((h, index) => {
             const wrapper = document.createElement("div");
             wrapper.className = `hero-card ${h.isSelected ? "selected" : ""}`;
+            if (wrapper.style && wrapper.style.setProperty) {
+                wrapper.style.setProperty("--hero-portrait", `url('assets/heroes/${h.spriteKey}_idle.png')`);
+            }
             
             // HP ratio
             const hpRatio = h.health / h.maxHealth;

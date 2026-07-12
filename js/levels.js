@@ -988,24 +988,67 @@ class LevelManager {
                     ctx.stroke();
                 }
             } else if (mask.type === "instrument") {
-                ctx.fillStyle = "rgba(7,17,14,.94)";
-                ctx.strokeStyle = mask.color || "#c49a53";
-                ctx.lineWidth = 5;
-                ctx.beginPath();
-                ctx.ellipse(mask.x, mask.y, mask.w * 0.46, mask.h * 0.42, -0.15, 0, Math.PI * 2);
-                ctx.fill(); ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(mask.x, mask.y); ctx.lineTo(mask.x + mask.w * 0.28, mask.y - mask.h * 0.58);
-                ctx.stroke();
-            } else {
-                ctx.fillStyle = mask.color || "#182820";
-                ctx.strokeStyle = "rgba(228,195,115,.28)";
+                // Compact brass field instrument with an enamel lens. The old
+                // oversized neon loop read as unfinished targeting debug art.
+                const accent = mask.color || "#5ad8e8";
+                const body = ctx.createLinearGradient(mask.x, mask.y - mask.h * .55, mask.x, GAME_HEIGHT);
+                body.addColorStop(0, "#51605b");
+                body.addColorStop(.45, "#273631");
+                body.addColorStop(1, "#111b18");
+                ctx.fillStyle = body;
+                ctx.strokeStyle = "#b68b46";
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.ellipse(mask.x, mask.y, mask.w * 0.52, mask.h * 0.58, -0.08, Math.PI, Math.PI * 2);
-                ctx.lineTo(mask.x + mask.w * 0.52, GAME_HEIGHT + 8);
-                ctx.lineTo(mask.x - mask.w * 0.52, GAME_HEIGHT + 8);
-                ctx.closePath(); ctx.fill(); ctx.stroke();
+                ctx.moveTo(mask.x - mask.w * .34, GAME_HEIGHT + 4);
+                ctx.lineTo(mask.x - mask.w * .25, mask.y - mask.h * .08);
+                ctx.quadraticCurveTo(mask.x, mask.y - mask.h * .34, mask.x + mask.w * .25, mask.y - mask.h * .08);
+                ctx.lineTo(mask.x + mask.w * .34, GAME_HEIGHT + 4);
+                ctx.closePath();
+                ctx.fill(); ctx.stroke();
+                ctx.fillStyle = "#172522";
+                ctx.strokeStyle = "#d1a85a";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(mask.x, mask.y - mask.h * .24, mask.w * .19, 0, Math.PI * 2);
+                ctx.fill(); ctx.stroke();
+                ctx.fillStyle = accent;
+                ctx.globalAlpha = .78;
+                ctx.beginPath();
+                ctx.arc(mask.x, mask.y - mask.h * .24, mask.w * .11, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+                ctx.strokeStyle = "#d1a85a";
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(mask.x + mask.w * .1, mask.y - mask.h * .39);
+                ctx.lineTo(mask.x + mask.w * .3, mask.y - mask.h * .66);
+                ctx.stroke();
+            } else {
+                // Layered boulders with warm rim light instead of a single
+                // opaque semicircle pasted over the painted terrain.
+                const stones = [
+                    { dx: -.28, s: .72, y: 6 },
+                    { dx: 0, s: 1, y: 0 },
+                    { dx: .3, s: .68, y: 8 },
+                ];
+                stones.forEach(stone => {
+                    const x = mask.x + mask.w * stone.dx;
+                    const w = mask.w * .38 * stone.s;
+                    const h = mask.h * .68 * stone.s;
+                    const grad = ctx.createLinearGradient(x, mask.y - h, x, GAME_HEIGHT);
+                    grad.addColorStop(0, "#69716d");
+                    grad.addColorStop(.48, "#35413d");
+                    grad.addColorStop(1, "#17211e");
+                    ctx.fillStyle = grad;
+                    ctx.strokeStyle = "rgba(229,196,124,.42)";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x - w, GAME_HEIGHT + 8);
+                    ctx.quadraticCurveTo(x - w * .9, mask.y - h * .42 + stone.y, x - w * .22, mask.y - h + stone.y);
+                    ctx.quadraticCurveTo(x + w * .72, mask.y - h * .72 + stone.y, x + w, GAME_HEIGHT + 8);
+                    ctx.closePath();
+                    ctx.fill(); ctx.stroke();
+                });
             }
             ctx.restore();
         });
