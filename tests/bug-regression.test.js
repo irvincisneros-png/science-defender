@@ -379,6 +379,72 @@ check("build pads on the path are filtered out; placement rejects the road", () 
   if (game.towers.length !== 0) throw new Error("placeTower must reject a pad on the path");
 });
 
+check("placement sanitizes overlapping pads and unsafe battlefield edges", () => {
+  const game = new globalThis.Game();
+  game.level = {
+    waypoints: [{ x: -20, y: 275 }, { x: 920, y: 275 }],
+    _spawnPoint: { x: 58, y: 275 },
+    _basePoint: { x: 842, y: 275 },
+    buildSpots: [
+      { x: 20, y: 20 },             // outside actor-safe frame
+      { x: 200, y: 160 },
+      { x: 205, y: 162 },           // overlaps the previous tower footprint
+      { x: 350, y: 275 },           // on the path
+      { x: 500, y: 390 },
+    ],
+  };
+  game.sanitizeBuildSpots("test");
+  if (game.level.buildSpots.length < 8) throw new Error(`expected a playable 8-pad set (got ${game.level.buildSpots.length})`);
+  if (!game.level.buildSpots.some(p => p.x === 200) || !game.level.buildSpots.some(p => p.x === 500))
+    throw new Error("sanitizer removed a valid foundation");
+});
+
+check("placement sanitizer retains a playable foundation set on every campaign map", () => {
+  const game = new globalThis.Game();
+  for (let i = 0; i < globalThis.LEVEL_DATA.length; i++) {
+    game.level = JSON.parse(JSON.stringify(globalThis.LEVEL_DATA[i]));
+    game.level.route = new globalThis.PathGeometry(game.level.controlPoints || game.level.waypoints, game.level.routeOptions || {});
+    game.level.waypoints = game.level.route.controlPoints;
+    const wps = game.level.waypoints;
+    const clampIn = p => ({ x: Math.min(Math.max(p.x, 58), 842), y: Math.min(Math.max(p.y, 58), 492) });
+    game.level._spawnPoint = clampIn(wps[0]);
+    game.level._basePoint = clampIn(wps[wps.length - 1]);
+    game.sanitizeBuildSpots(i);
+    if (game.level.buildSpots.length < 6) throw new Error(`level ${i + 1} retained only ${game.level.buildSpots.length} safe pads`);
+  }
+});
+
+check("keyboard build-pad navigation follows screen direction", () => {
+  const game = new globalThis.Game();
+  const origin = { x: 300, y: 250 };
+  const left = { x: 120, y: 260 }, right = { x: 510, y: 245 };
+  const up = { x: 305, y: 100 }, down = { x: 290, y: 430 };
+  const pads = [down, right, origin, left, up]; // deliberately non-spatial authored order
+  if (game.findDirectionalPad(origin, "ArrowLeft", pads) !== left) throw new Error("left arrow did not select left pad");
+  if (game.findDirectionalPad(origin, "ArrowRight", pads) !== right) throw new Error("right arrow did not select right pad");
+  if (game.findDirectionalPad(origin, "ArrowUp", pads) !== up) throw new Error("up arrow did not select upper pad");
+  if (game.findDirectionalPad(origin, "ArrowDown", pads) !== down) throw new Error("down arrow did not select lower pad");
+});
+
+check("placement state distinguishes valid, occupied, and unaffordable pads", () => {
+  const game = new globalThis.Game();
+  game.gameState = "playing";
+  game.level = JSON.parse(JSON.stringify(globalThis.LEVEL_DATA[0]));
+  game.unlocks = game.getLevelUnlocks(0);
+  game.selectedTowerType = "physics";
+  game.gold = 999;
+  const pad = game.level.buildSpots[0];
+  let state = game.getTowerPlacementState(pad.x, pad.y);
+  if (!state.valid || state.pad !== pad) throw new Error("free affordable pad should be valid");
+  pad.occupied = true;
+  state = game.getTowerPlacementState(pad.x, pad.y);
+  if (state.valid || state.reason !== "Foundation occupied") throw new Error("occupied pad should explain rejection");
+  pad.occupied = false;
+  game.gold = 0;
+  state = game.getTowerPlacementState(pad.x, pad.y);
+  if (state.valid || !state.reason.startsWith("Need ")) throw new Error("unaffordable pad should explain missing gold");
+});
+
 // ===========================================================================
 // PHASE 4 (Realm Defense mechanics): stars + permanent (meta) upgrades.
 // ===========================================================================
@@ -1067,11 +1133,17 @@ check("selected-level staging excludes unrelated enemy sheets and releases super
   if (keys.includes("enemy_boss_entropy_walk") || keys.includes("enemy_alchemy_walk")) throw new Error("unrelated enemy eagerly staged");
   const lateKeys = g.getLevelAssetKeys(19);
   if (!lateKeys.includes("tower_volcano_4_attack") || !lateKeys.includes("tower_barracks_4_idle") || !lateKeys.includes("hero_fieldteam_walk")) throw new Error("late tower/blocker art missing from staged set");
-  let released = false;
-  globalThis.spriteAssets.enemy_alchemy_walk = { set src(v) { if (v === "") released = true; } };
+  let released = false, handlersCleared = false;
+  globalThis.spriteAssets.enemy_alchemy_walk = {
+    onload() {}, onerror() {},
+    set src(v) {
+      if (v === "") released = true;
+      handlersCleared = this.onload === null && this.onerror === null;
+    }
+  };
   g._levelAssetKeys = ["enemy_alchemy_walk"];
   g.releaseLevelAssets(keys);
-  if (!released || globalThis.spriteAssets.enemy_alchemy_walk) throw new Error("superseded image retained");
+  if (!released || !handlersCleared || globalThis.spriteAssets.enemy_alchemy_walk) throw new Error("superseded image retained or warned during release");
 });
 
 check("every level declares foreground occluders rendered in a post-actor pass", () => {

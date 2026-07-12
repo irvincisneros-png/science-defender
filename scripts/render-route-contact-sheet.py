@@ -21,8 +21,13 @@ for index, row in enumerate(report["levels"]):
     draw = ImageDraw.Draw(background, "RGBA")
     sx, sy = thumb_w / 900, thumb_h / 550
     points = [(x * sx, y * sy) for x, y in row["samples"]]
-    draw.line(points, fill=(20, 16, 12, 230), width=14, joint="curve")
-    draw.line(points, fill=(234, 204, 139, 245), width=8, joint="curve")
+    material = row["pathMaterial"]
+    shoulder = material["shoulder"]
+    edge = material["edge"]
+    body = material["body"]
+    draw.line(points, fill=shoulder, width=21, joint="curve")
+    draw.line(points, fill=edge, width=17, joint="curve")
+    draw.line(points, fill=body, width=14, joint="curve")
     for x, y in row["pads"]:
         px, py = x * sx, y * sy
         draw.ellipse((px - 6, py - 6, px + 6, py + 6), fill=(31, 100, 73, 235), outline=(244, 222, 165, 255), width=2)

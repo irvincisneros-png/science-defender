@@ -18,14 +18,15 @@ Built with vanilla **HTML5 / CSS / JavaScript** — no build step, no dependenci
 - **4 scientist heroes** — Einstein, Newton, Curie, Darwin — with passive auras, levelling (XP from
   kills), death/respawn, and aimed active abilities (press **1–4** or the on-screen bar, then click
   to cast).
-- **20 themed campaign levels** with painted backgrounds, bosses at 5 / 10 / 15 / 20, plus an
-  Endless mode.
+- **20 themed campaign levels** with painted backgrounds, biome-integrated route materials, safely
+  distributed tower foundations, bosses at 5 / 10 / 15 / 20, plus an Endless mode.
 - **Curriculum-driven** — 225+ questions across Years 7–10, selectable by year group and topic/exam.
 - **Quality-of-life:** 2× speed, call-wave-early, enemy traits (flying / armored / shielded / healer),
   star-based meta-progression (Lab Bench), a monster bestiary, full audio (music + procedural SFX),
   and a mute toggle.
 - **Modern renderer:** fixed 60 Hz simulation with interpolated DPR canvas rendering, staged
-  selected-level art, foreground occlusion, reduced-motion support, and keyboard build-pad placement.
+  selected-level art, foreground occlusion, reduced-motion support, full tower placement previews,
+  and spatial keyboard build-pad navigation.
 - **Illustrated expedition art:** a complete production roster of 17 regular enemies and 5 bosses,
   generated 128px progression art for all 6 tower families, illustrated battlefield objectives,
   enlarged scientist heroes, blocker troops, and an original outlined HUD icon family.

@@ -5,6 +5,23 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-07-13 — Biome-integrated routes and placement overhaul
+
+- Gave all 20 biomes distinct route palettes, shoulders, edge wear and deterministic material details,
+  replacing the universal dark road treatment with paths that sit naturally inside each painting.
+- Added six compact Image Gen surface families—laboratory plating, organic earth, volcanic basalt,
+  frost flagstone, cosmic inlay and academy pavers—blended beneath the per-level colors.
+- Rebuilt tower placement with 58px touch snapping, full 96px tower ghosts, range/cost previews,
+  valid/invalid foundation focus, persistent occupied bases and explicit placement status.
+- Added stronger path, endpoint, screen-edge and tower-footprint clearance; unsafe authored pads are
+  replaced deterministically so every campaign map retains at least eight playable foundations.
+- Added spatial arrow-key navigation, Enter placement, Escape cancellation, pointer priority while
+  placement is armed, and accessible affordability/max-limit state in the Field Kit.
+- Fixed false missing-sprite warnings when releasing staged level assets during map changes.
+
+**Verified:** 72/72 gameplay checks, environment presentation tests, route policy across all 20 maps,
+strict audit of 160 assets with 0 errors/0 warnings, and zero-warning desktop/mobile browser placement flows.
+
 ## 2026-07-12 — Visual overhaul v2: production-scale actors and generated structures
 
 - Replaced all 36 tower progression strips with new Image Gen art for Physics, Biology,

@@ -33,6 +33,7 @@ const rows = LEVEL_DATA.map(level => {
     unionCoverage: Number((covered / route.samples.length).toFixed(3)),
     maxSinglePadCoverage: Number((maxSingle / route.samples.length).toFixed(3)),
     foregroundMasks: (level.foreground || []).length,
+    pathMaterial: level.pathMaterial || null,
     ...(process.argv.includes("--include-samples") ? {
       samples: route.samples.map(sample => [Number(sample.x.toFixed(1)), Number(sample.y.toFixed(1))]),
       pads: valid.map(pad => [pad.x, pad.y]),
@@ -46,7 +47,8 @@ else {
   rows.forEach(row => console.log(`${String(row.level).padStart(2)} | ${row.theme.padEnd(12)} | ${String(row.routeLength).padStart(4)} | ${row.authoredPads}->${row.validPads} | ${String(row.minSeparation).padStart(5)} | ${String(Math.round(row.unionCoverage * 100)).padStart(3)}% | ${String(Math.round(row.maxSinglePadCoverage * 100)).padStart(3)}% | ${row.foregroundMasks}`));
 }
 
-const failures = rows.filter(row => row.validPads < 8 || row.unionCoverage < 0.60 || row.maxSinglePadCoverage > 0.40 || row.foregroundMasks < 1);
+const failures = rows.filter(row => row.validPads < 8 || row.unionCoverage < 0.60 || row.maxSinglePadCoverage > 0.40 || row.foregroundMasks < 1 ||
+  !row.pathMaterial || !row.pathMaterial.body || !row.pathMaterial.shoulder || !row.pathMaterial.texture);
 if (failures.length) {
   console.error(`Geometry policy failed: ${failures.map(row => `L${row.level}`).join(", ")}`);
   process.exitCode = 1;
