@@ -1910,6 +1910,48 @@ select {
     body { overflow: auto; }
     #app-container { min-height: 100dvh; }
     .screen { overflow-y: auto; }
+    #screen-playing { overflow: hidden; }
+    #screen-playing .game-viewport > div:last-child {
+        background:
+            radial-gradient(circle at 50% 58%, rgba(38, 92, 78, .23), transparent 42%),
+            linear-gradient(180deg, #07120f, #0b211c 54%, #07120f);
+    }
+    #screen-playing .hud-header {
+        height: 100px;
+        min-height: 100px;
+        padding: 4px 8px;
+        flex-wrap: wrap;
+        align-content: center;
+        gap: 4px;
+    }
+    #screen-playing .hud-stat-box {
+        width: 100%;
+        flex: 0 0 100%;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+    }
+    #screen-playing .hud-stat {
+        min-width: 0;
+        min-height: 38px;
+        padding: 2px 3px;
+    }
+    #screen-playing .hud-quick-controls {
+        width: 100%;
+        justify-content: center;
+        gap: 5px;
+    }
+    #screen-playing .hud-quick-controls button {
+        width: min(82px, 22vw);
+        min-width: 44px;
+        height: 44px;
+        min-height: 44px;
+    }
+    #screen-playing #hud-log { top: 106px; }
+    #screen-playing #hero-ability-bar {
+        top: calc(50% + 30.56vw + 12px);
+        bottom: auto;
+    }
     .topic-selection-bar,
     .dropdown-wrapper,
     .meta-row { flex-direction: column; align-items: stretch; }
@@ -1924,6 +1966,18 @@ select {
     .title-container { margin-bottom: 14px; padding-block: 12px; }
     .title-main { font-size: 34px; }
     .menu-buttons { gap: 8px; padding: 12px; }
+    .learning-card { padding: 10px 14px; }
+    .learning-card h2 { margin: 1px 0 5px; font-size: 23px; }
+    .learning-kicker { font-size: 8px; }
+    .mission-brief .atlas-story { display: none; }
+    .claim-card { margin: 5px 0; padding: 7px 10px; }
+    .learning-fieldset { gap: 4px; margin: 5px 0 3px; }
+    .learning-fieldset legend { margin-bottom: 3px; font-size: 14px; }
+    .learning-option { min-height: 44px; padding-block: 6px; }
+    .learning-note { font-size: 9px; }
+    .instrument-readout { grid-template-columns: 90px 1fr; padding: 7px; }
+    .instrument-readout img { width: 90px; height: 62px; }
+    .instrument-readout p { font-size: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1933,6 +1987,82 @@ select {
         animation-iteration-count: 1 !important;
         transition-duration: .01ms !important;
     }
+}
+
+/* Atlas of Evidence vertical slice */
+.atlas-progress {
+    min-width: 112px;
+    padding: 7px 10px;
+    border: 1px solid rgba(102, 242, 255, .4);
+    border-radius: 9px;
+    background: rgba(8, 37, 34, .72);
+    color: #d9fff9;
+    font-size: 10px;
+    line-height: 1.25;
+}
+.atlas-progress span, .atlas-progress strong { display: block; }
+.atlas-progress strong { color: #66f2ff; }
+
+.atlas-mission-panel {
+    border-color: rgba(102, 242, 255, .42) !important;
+    background: linear-gradient(135deg, rgba(24, 75, 68, .88), rgba(11, 39, 42, .92));
+}
+.atlas-mission-panel p { margin: 3px 0 7px; color: #d9fff9; font-size: 10px; }
+.atlas-step-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.atlas-step-row span { padding: 4px 3px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; color: #a6b9b5; font-size: 8px; text-align: center; }
+.atlas-step-row span.complete { border-color: #66f2ff; color: #fff; background: rgba(38, 142, 129, .5); }
+
+.learning-modal { padding: 14px; overflow: auto; }
+.learning-card {
+    width: min(720px, 94vw);
+    max-height: calc(100dvh - 28px);
+    overflow: auto;
+    padding: 26px;
+    border: 3px solid #cba85b;
+    border-radius: 18px;
+    background: linear-gradient(rgba(255,255,255,.18), transparent 28%), #f3ead0;
+    box-shadow: 0 20px 60px rgba(0,0,0,.72), inset 0 0 0 2px rgba(101,73,35,.22);
+    color: #263a35;
+    user-select: text;
+}
+.learning-card h2 { margin: 4px 0 12px; color: #24594c; font-family: var(--font-heading); font-size: clamp(24px, 4vw, 34px); }
+.learning-kicker { color: #795928; font-size: 10px; font-weight: 800; letter-spacing: .17em; text-transform: uppercase; }
+.atlas-story { margin-bottom: 13px; line-height: 1.45; }
+.claim-card { display: grid; gap: 4px; margin: 13px 0; padding: 13px 15px; border-left: 5px solid #be6b43; background: #fff7df; }
+.learning-fieldset { display: grid; gap: 8px; margin: 14px 0 8px; padding: 0; border: 0; }
+.learning-fieldset legend { margin-bottom: 8px; color: #253c36; font-size: 17px; font-weight: 800; line-height: 1.35; }
+.learning-option, .learning-continue, .hint-button { min-height: 46px; text-transform: none; }
+.learning-option { width: 100%; border: 2px solid #486c62; background: linear-gradient(#3b7869, #24584e); text-align: left; }
+.learning-option:disabled { opacity: .72; }
+.learning-note { color: #635d4f; font-size: 12px; }
+.learning-feedback { margin-top: 12px; min-height: 1.4em; line-height: 1.45; }
+.learning-feedback .learning-continue, .learning-continue { display: block; width: 100%; margin-top: 13px; }
+.learning-hint, .evidence-advantage { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #e1f1e8; color: #244c42; }
+.hint-button { margin-top: 6px; padding: 8px 15px; background: linear-gradient(#756384, #4d3c5e); }
+.instrument-readout { display: grid; grid-template-columns: 140px 1fr; gap: 15px; align-items: center; padding: 12px; border: 2px solid #8f713d; border-radius: 12px; background: #172e2a; color: #effff8; }
+.instrument-readout img { width: 140px; height: 100px; object-fit: contain; }
+.instrument-readout p { margin-top: 5px; font: 700 17px/1.4 var(--font-heading); color: #fff1bb; }
+.cer-debrief label { display: grid; gap: 5px; margin: 12px 0; }
+.cer-debrief select { width: 100%; min-height: 48px; padding: 8px 10px; border: 2px solid #52746b; border-radius: 8px; background: #fffdf4; color: #263a35; font-size: 14px; white-space: normal; }
+.result-split { display: grid; gap: 4px; margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(105,76,38,.28); border-radius: 9px; }
+.result-split strong { color: #265a49; }
+.result-split span { color: #3f4b45; font-size: 12px; }
+.learning-result { background: rgba(72, 130, 111, .11); }
+.evidence-dossier { margin-top: 10px; padding: 10px; border: 1px solid rgba(102,242,255,.25); border-radius: 8px; }
+.evidence-dossier p { margin-top: 6px; font-size: 12px; line-height: 1.35; }
+.evidence-dossier.incomplete { opacity: .76; }
+
+@media (max-width: 900px) {
+    .atlas-progress { display: none; }
+    .learning-card { padding: 18px; }
+    .instrument-readout { grid-template-columns: 105px 1fr; }
+    .instrument-readout img { width: 105px; height: 78px; }
+}
+
+@media (max-width: 520px) {
+    .instrument-readout { grid-template-columns: 1fr; text-align: center; }
+    .instrument-readout img { margin: auto; }
+    .learning-card { width: 96vw; padding: 15px; }
 }
 
 /* ==========================================================================
@@ -2709,4 +2839,19 @@ select {
     .end-screen .end-details p { margin-bottom: 4px; font-size: 12px !important; }
     .retry-tip { display: none; }
     .end-actions { margin-top: 10px; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+    .learning-card { padding: 10px 14px; }
+    .learning-card h2 { margin: 1px 0 5px; font-size: 23px; }
+    .learning-kicker { font-size: 8px; }
+    .mission-brief .atlas-story { display: none; }
+    .claim-card { margin: 5px 0; padding: 7px 10px; }
+    .learning-fieldset { gap: 4px; margin: 5px 0 3px; }
+    .learning-fieldset legend { margin-bottom: 3px; font-size: 14px; }
+    .learning-option { min-height: 44px; padding-block: 6px; }
+    .learning-note { font-size: 9px; }
+    .instrument-readout { grid-template-columns: 90px 1fr; padding: 7px; }
+    .instrument-readout img { width: 90px; height: 62px; }
+    .instrument-readout p { font-size: 14px; }
 }

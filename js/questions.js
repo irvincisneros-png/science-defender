@@ -52,6 +52,19 @@ const FALLBACK_QUESTIONS = [
     { q: "Which organelle is the powerhouse of the cell?", o: ["Nucleus", "Ribosome", "Mitochondrion", "Chloroplast"], a: 2, exp: "Mitochondria produce most of the cell's ATP energy.", topic: "cells", topicName: "Science" },
 ];
 
+// Stable, content-derived IDs survive pool shuffles and source-file reordering.
+// They intentionally include year/topic so identical prompts in two curriculum
+// contexts remain distinct. Version suffixes allow reviewed item revisions.
+function stableQuestionId(year, topic, prompt) {
+    const normalized = `${year}|${topic}|${String(prompt || "").trim().toLowerCase().replace(/\s+/g, " ")}`;
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < normalized.length; i++) {
+        hash ^= normalized.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return `sd.y${year}.${topic}.${hash.toString(16).padStart(8, "0")}.v1`;
+}
+
 class QuestionManager {
     constructor() {
         this.currentYear = 8;            // default to a year the teacher uses
@@ -97,12 +110,12 @@ class QuestionManager {
         chosenKeys.forEach(key => {
             const name = (meta.find(t => t.key === key) || {}).name || "Science";
             (bank[key] || []).forEach(q => {
-                this.activePool.push({ ...q, topic: key, topicName: name });
+                this.activePool.push({ ...q, id: q.id || stableQuestionId(this.currentYear, key, q.q), version: q.version || 1, topic: key, topicName: name });
             });
         });
 
         if (this.activePool.length === 0) {
-            this.activePool = FALLBACK_QUESTIONS.map(q => ({ ...q }));
+            this.activePool = FALLBACK_QUESTIONS.map(q => ({ ...q, id: q.id || stableQuestionId(this.currentYear, q.topic || "fallback", q.q), version: 1 }));
         }
 
         this.queue = this.shuffledCopy(this.activePool);
@@ -141,3 +154,4 @@ class QuestionManager {
 
 // Make globally available
 window.QuestionManager = QuestionManager;
+window.stableQuestionId = stableQuestionId;

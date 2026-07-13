@@ -51,7 +51,7 @@ assert(heroSprite.width === hero.size && heroSprite.height === hero.size, "hero 
 assert(Math.abs((heroSprite.y + heroSprite.height * hero.getSpriteFootRatio(heroSprite.state)) - (hero.y + hero.groundOffset)) < 0.001,
   "hero sprite feet are not pinned to the ground anchor");
 assert(hero.range === 110, "hero visual scale changed logical attack range");
-assert(enemySource.includes("this.size = size * 2.25"), "enemy presentation multiplier regressed below the enlarged silhouette scale");
+assert(enemySource.includes("this.size = size * 2.65"), "enemy presentation multiplier regressed below the enlarged silhouette scale");
 assert(!enemySource.includes('traits.push([\">\", \"Fast\"])'), "fast enemies still render the ambiguous > face-like badge");
 assert(enemySource.includes('traits.push([\"⚡\", \"Fast\"])'), "fast enemies lack a clear speed-trait indicator");
 

@@ -71,6 +71,10 @@
                     <div style="display:flex; align-items:flex-end;">
                         <span id="pool-count" style="font-size: 11px; color: #00ff66;"></span>
                     </div>
+                    <div class="atlas-progress" aria-label="Atlas learning progress">
+                        <span>Atlas Evidence</span>
+                        <strong id="atlas-mastery-count">0 learning items</strong>
+                    </div>
                 </div>
             </div>
 
@@ -149,6 +153,15 @@
             <details class="hud-sidebar" open>
                 <summary><span>Field Kit</span><span class="tray-hint">Towers, items &amp; heroes</span></summary>
                 <div class="hud-sidebar-content">
+                <section id="atlas-mission-panel" class="hud-tray-section atlas-mission-panel" aria-labelledby="atlas-mission-heading" hidden>
+                    <h2 id="atlas-mission-heading">Atlas of Evidence</h2>
+                    <p id="atlas-mission-status">Prediction pending</p>
+                    <div class="atlas-step-row" aria-label="Mission evidence progress">
+                        <span data-atlas-step="prediction">1 Predict</span>
+                        <span data-atlas-step="evidence1">2 Test</span>
+                        <span data-atlas-step="evidence2">3 Explain</span>
+                    </div>
+                </section>
                 <section class="hud-tray-section" aria-labelledby="shop-heading">
                 <h2 id="shop-heading">Research Stations</h2>
                 <div class="shop-grid">
@@ -299,6 +312,10 @@
         <!-- Dynamic populated Question Form -->
     </div>
 
+    <div id="learning-modal" class="modal learning-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="learning-modal-title" tabindex="-1">
+        <!-- Atlas mission, evidence breaks and CER debrief render here. -->
+    </div>
+
     <!-- Active Pause Modal -->
     <div id="pause-modal" class="modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pause-title" tabindex="-1">
         <div class="question-container pause-container">
@@ -315,6 +332,7 @@
     <script src="js/questions-y9.js"></script>
     <script src="js/questions-y10.js"></script>
     <script src="js/questions.js"></script>
+    <script src="js/learning.js"></script>
     <script src="js/particles.js"></script>
     <script src="js/path-geometry.js"></script>
     <script src="js/levels.js"></script>

@@ -122,6 +122,7 @@ check_viewport() {
 
 check_viewport 1280 720 desktop-1280x720
 check_viewport 844 390 iphone-landscape-844x390
+check_viewport 390 844 mobile-portrait-390x844
 
 # Browser exceptions and failed asset requests are surfaced separately from layout.
 "$PWCLI" --session "$SESSION" console error | tee "$OUT/console-errors.txt"

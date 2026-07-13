@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-13 — Atlas of Evidence vertical slice
+
+- Added a Level 3 phlogiston mission that moves through prediction, two battlefield evidence breaks,
+  misconception-specific feedback/retry and a claim–evidence–reasoning debrief.
+- Made evidence mechanically meaningful: phlogiston embers carry a visible claim shield until the
+  sealed-vessel result is interpreted, after which they take full damage; the second result grants a
+  short analysis slowdown without locking progress.
+- Added deterministic content-derived IDs to the full curriculum bank and a separate
+  `std_learning_mastery_v1` local record with first-attempt, hint, timing, state and review-due data.
+- Split victory reporting into combat stars and Atlas learning state, and expanded Phlogiston Field
+  Notes into a claim/evidence/current-model dossier.
+- Added an ImageGen brass/enamel oxygen-balance instrument and responsive accessible evidence UI.
+- Fixed the battle HUD’s stale hard-coded level name, now reflecting every selected expedition.
+- Reflowed the portrait battle HUD so all four controls remain visible at 390 px, grouped the hero
+  ability control with the field, raised regular enemy presentation from 2.25× to 2.65×, and reduced
+  oversized portal/base art so endpoints no longer overpower actors and bosses.
+- Added a warm silhouette halo and persistent non-colour-only boss nameplate, clarifying Level 15's
+  twin crisis and separating the dark final boss from the Heat-Death field.
+
 All notable changes made by Claude to the Science Tower Defense game are documented here.
 Format: each entry lists **what** changed, **where** (file:line), **why** (the bug/root cause), and **how** it was verified.
 
