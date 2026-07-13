@@ -21,6 +21,9 @@ Built with vanilla **HTML5 / CSS / JavaScript** — no build step, no dependenci
 - **20 themed campaign levels** with painted backgrounds, biome-integrated route materials, safely
   distributed tower foundations, bosses at 5 / 10 / 15 / 20, plus an Endless mode.
 - **Curriculum-driven** — 225+ questions across Years 7–10, selectable by year group and topic/exam.
+- **Atlas of Evidence learning slice** — Level 3 now links a mission claim, prediction, live measurements,
+  a misconception-specific combat shield, scaffolded retry, CER debrief and refutation dossier. All
+  curriculum items receive deterministic IDs, and learning records are stored separately from stars.
 - **Quality-of-life:** 2× speed, call-wave-early, enemy traits (flying / armored / shielded / healer),
   star-based meta-progression (Lab Bench), a monster bestiary, full audio (music + procedural SFX),
   and a mute toggle.
@@ -55,7 +58,8 @@ node tests/bug-regression.test.js
 node tests/tooling-validation.test.js
 ```
 
-The current regression baseline is **69 checks** (68 gameplay plus actor-presentation coverage). Tooling validation also runs regular and boss sprite QA and a
+The current regression baseline includes **72 gameplay checks** plus focused learning-flow, animation,
+environment and tooling tests. Tooling validation also runs regular and boss sprite QA and a
 20-level route/pad coverage report.
 
 Asset integrity, sprite-sheet dimensions, payload size, duplicate content, and literal runtime
@@ -67,7 +71,8 @@ node scripts/asset-audit.js --json   # machine-readable report
 node scripts/asset-audit.js --strict # also fail on optimization/legacy warnings
 ```
 
-For a real-browser layout smoke test at desktop `1280x720` and iPhone-landscape `844x390`, run:
+For a real-browser layout smoke test at desktop `1280x720`, iPhone-landscape `844x390`, and
+phone portrait `390x844`, run:
 
 ```bash
 bash scripts/browser-smoke.sh

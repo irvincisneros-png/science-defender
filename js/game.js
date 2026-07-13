@@ -210,6 +210,8 @@ class Game {
         // Managers and Pools
         this.questionManager = new QuestionManager();
         this.particleSystem = new ParticleSystem();
+        this.learningStore = window.LearningMasteryStore ? new window.LearningMasteryStore() : null;
+        this.learningSession = null;
         
         this.level = null; // Current level object
         this.isEndless = false;
@@ -536,6 +538,14 @@ class Game {
             const card = document.createElement("div");
             card.className = "bestiary-card" + (seen ? "" : " locked");
             if (seen) {
+                const dossierComplete = e.key === "phlogiston" && this.learningStore && !!this.learningStore.mission("atlas-phlogiston-01");
+                const dossier = e.dossier ? `
+                    <div class="evidence-dossier ${dossierComplete ? "complete" : "incomplete"}">
+                        <strong>${dossierComplete ? "Evidence dossier complete" : "Evidence dossier awaiting Level 3 investigation"}</strong>
+                        <p><b>Claim:</b> ${e.dossier.claim}</p>
+                        <p><b>Why it seemed plausible:</b> ${e.dossier.plausibleBecause}</p>
+                        ${dossierComplete ? `<p><b>Evidence:</b> ${e.dossier.evidence}</p><p><b>Current model:</b> ${e.dossier.currentModel}</p><p><b>Test it:</b> ${e.dossier.testIt}</p>` : ""}
+                    </div>` : "";
                 card.innerHTML = `
                     <div class="bestiary-head">
                         <span class="bestiary-name">${e.name}</span>
@@ -544,6 +554,7 @@ class Game {
                     <div class="bestiary-role">${e.role}</div>
                     <div class="bestiary-desc">${e.desc}</div>
                     <div class="bestiary-counter"><strong>Counter:</strong> ${e.counter}</div>
+                    ${dossier}
                 `;
             } else {
                 card.innerHTML = `
@@ -653,6 +664,8 @@ class Game {
         this.spawnDefaultHero(levelIndex);
 
         this.gameState = "playing";
+        const levelName = document.getElementById("level-name-txt");
+        if (levelName) levelName.textContent = this.level.name.replace(/^Level\s+\d+\s*:\s*/i, "");
         this.applyLevelUnlocks();
         this.updateSidebarUI();
         this.showInGameNotification(`Objective: Defend against Scientific Misconceptions!`);
@@ -661,6 +674,7 @@ class Game {
         // swaps to the boss theme whenever a boss is on the field.
         this.battleTrack = `battle_${(levelIndex % 3) + 1}`;
         if (window.audioManager) window.audioManager.playMusic(this.battleTrack);
+        this.beginAtlasMission(levelIndex, endless);
     }
 
     spawnDefaultHero(levelIndex) {
@@ -1262,6 +1276,10 @@ class Game {
         else enemy = new FlatEarthEnemy(wp[0].x, wp[0].y, scale);
 
         enemy.bestiaryKey = type;
+        if (this.learningSession && type === this.learningSession.mission.enemyType && this.learningSession.evidencePhase < 1) {
+            enemy.claimShieldActive = true;
+            enemy.claimShieldFactor = 0.65;
+        }
         enemy.setPath(this.level.route);
         this.enemies.push(enemy);
         this.recordBestiaryEncounter(type);
@@ -1324,6 +1342,7 @@ class Game {
             } else {
                 // Start the between-wave countdown (Call Wave skips it for a bonus).
                 this.nextWaveCountdown = this.WAVE_COUNTDOWN_FRAMES;
+                this.maybeOpenEvidenceBreak(this.waveNumber);
             }
 
             this.updateSidebarUI();
@@ -1516,7 +1535,7 @@ class Game {
                 if (img && img.complete && img.naturalWidth > 0) {
                     const p = this.level._spawnPoint;
                     const pulse = 1 + Math.sin(performance.now() / 420) * 0.025;
-                    const size = 118 * pulse;
+                    const size = 96 * pulse;
                     this.ctx.save();
                     this.ctx.shadowColor = "rgba(225, 60, 255, 0.72)";
                     this.ctx.shadowBlur = 18;
@@ -1532,14 +1551,14 @@ class Game {
                 const img = window.spriteAssets && window.spriteAssets.battle_empirical_core;
                 if (img && img.complete && img.naturalWidth > 0) {
                     const p = this.level._basePoint;
-                    const size = 122 + flash * 7;
+                    const size = 100 + flash * 6;
                     this.ctx.save();
                     this.ctx.globalAlpha = 0.82 + ratio * 0.18;
                     this.ctx.shadowColor = flash > 0 ? "rgba(255, 100, 80, 0.95)" : "rgba(40, 225, 255, 0.65)";
                     this.ctx.shadowBlur = 16 + flash * 18;
                     this.ctx.drawImage(img, p.x - size / 2, p.y - size * 0.58, size, size);
                     this.ctx.restore();
-                    const barW = 76, barY = p.y - 64;
+                    const barW = 66, barY = p.y - 55;
                     this.ctx.save();
                     this.ctx.fillStyle = "rgba(7, 18, 24, 0.82)";
                     this.ctx.fillRect(p.x - barW / 2 - 2, barY - 2, barW + 4, 9);
@@ -2227,6 +2246,7 @@ class Game {
             }
             container.appendChild(card);
         });
+        this.updateAtlasPanel();
     }
 
     // Legacy: refresh just the star badges (kept for safety).
@@ -2550,6 +2570,10 @@ class Game {
                 if (event.key === "Escape") {
                     event.preventDefault();
                     if (modal.id === "pause-modal") togglePauseGame();
+                    else if (modal.id === "learning-modal") {
+                        const feedback = modal.querySelector("#learning-feedback");
+                        if (feedback) feedback.textContent = "Complete this untimed evidence step to continue; hints and a scaffolded retry are always available.";
+                    }
                     else if (this.pendingBranch) window.closeBranchModal();
                     else window.closeQuestionModal();
                     return;
@@ -2706,6 +2730,235 @@ class Game {
         this.updateSidebarUI();
     }
 
+    // ---- Atlas of Evidence: one intrinsically integrated Level 3 slice ----
+    beginAtlasMission(levelIndex, endless) {
+        const mission = !endless && window.ATLAS_MISSIONS && window.ATLAS_MISSIONS[levelIndex];
+        this.learningSession = mission ? {
+            mission,
+            prediction: null,
+            evidencePhase: 0,
+            completedBreaks: [],
+            breakAttempts: {},
+            hintUsed: {},
+            responseStartedAt: Date.now(),
+            debriefAttempts: 0,
+            debriefComplete: false
+        } : null;
+        this.updateAtlasPanel();
+        if (!mission) return;
+        this.isPaused = true;
+        const p = mission.prediction;
+        this.openLearningModal(`
+            <div class="learning-card mission-brief">
+                <p class="learning-kicker">${mission.chapter}</p>
+                <h2 id="learning-modal-title">${mission.title}</h2>
+                <p class="atlas-story">A damaged page of the Empirical Atlas points to this rift. The Echo grows stronger while its claim goes untested.</p>
+                <div class="claim-card"><strong>Mission claim</strong><span>${mission.claim}</span></div>
+                <fieldset class="learning-fieldset"><legend>${p.prompt}</legend>
+                    ${p.options.map((option, index) => `<button type="button" class="learning-option" onclick="submitAtlasPrediction(${index})">${option}</button>`).join("")}
+                </fieldset>
+                <p class="learning-note">Make a prediction before seeing the measurements. Predictions are evidence of thinking, not combat grades.</p>
+                <div id="learning-feedback" class="learning-feedback" role="status" aria-live="polite"></div>
+            </div>`);
+    }
+
+    openLearningModal(html) {
+        const modal = document.getElementById("learning-modal");
+        if (!modal) return;
+        modal.innerHTML = html;
+        modal.style.display = "flex";
+        this.openAccessibleModal(modal);
+    }
+
+    submitAtlasPrediction(index) {
+        const session = this.learningSession;
+        if (!session || session.prediction != null) return;
+        const item = session.mission.prediction;
+        session.prediction = index;
+        if (this.learningStore) this.learningStore.record(item.id, {
+            correct: index === item.answer,
+            responseTimeMs: Date.now() - session.responseStartedAt
+        });
+        document.querySelectorAll("#learning-modal .learning-option").forEach(button => { button.disabled = true; });
+        const feedback = document.getElementById("learning-feedback");
+        if (feedback) feedback.innerHTML = `<strong>Prediction recorded.</strong> ${item.feedback[index]}<button type="button" class="learning-continue" onclick="continueAtlasMission()">Open the battlefield</button>`;
+        this.updateAtlasPanel();
+    }
+
+    continueAtlasMission() {
+        this.closeAccessibleModal(document.getElementById("learning-modal"));
+        this.isPaused = false;
+        this.showInGameNotification("Atlas mission active: test the phlogiston claim with evidence.");
+    }
+
+    maybeOpenEvidenceBreak(wave) {
+        const session = this.learningSession;
+        if (!session || session.debriefComplete) return false;
+        const breakIndex = session.mission.breaks.findIndex(item => item.wave === wave);
+        if (breakIndex < 0 || session.completedBreaks.includes(breakIndex)) return false;
+        this.isPaused = true;
+        session.activeBreakIndex = breakIndex;
+        session.responseStartedAt = Date.now();
+        this.renderEvidenceBreak(breakIndex);
+        return true;
+    }
+
+    renderEvidenceBreak(index, feedbackHtml = "") {
+        const session = this.learningSession;
+        if (!session) return;
+        const item = session.mission.breaks[index];
+        const attempts = session.breakAttempts[index] || 0;
+        this.openLearningModal(`
+            <div class="learning-card evidence-break">
+                <p class="learning-kicker">Battle paused · observation recorded</p>
+                <h2 id="learning-modal-title">${item.title}</h2>
+                <div class="instrument-readout">
+                    <img src="assets/ui/oxygen_balance.png" alt="Illustrated sealed-vessel oxygen balance instrument">
+                    <div><strong>Field instrument</strong><p>${item.observation}</p></div>
+                </div>
+                <fieldset class="learning-fieldset"><legend>${item.prompt}</legend>
+                    ${item.options.map((option, optionIndex) => `<button type="button" class="learning-option" onclick="submitEvidenceAnswer(${optionIndex})">${option}</button>`).join("")}
+                </fieldset>
+                ${attempts ? `<p class="learning-hint"><strong>Hint:</strong> ${item.hint}</p>` : `<button type="button" class="hint-button" onclick="showEvidenceHint()">Show a hint</button>`}
+                <div id="learning-feedback" class="learning-feedback" role="status" aria-live="polite">${feedbackHtml}</div>
+            </div>`);
+    }
+
+    showEvidenceHint() {
+        const session = this.learningSession;
+        if (!session || session.activeBreakIndex == null) return;
+        const index = session.activeBreakIndex;
+        session.hintUsed[index] = true;
+        const item = session.mission.breaks[index];
+        const hint = document.querySelector("#learning-modal .hint-button");
+        if (hint) hint.outerHTML = `<p class="learning-hint"><strong>Hint:</strong> ${item.hint}</p>`;
+    }
+
+    submitEvidenceAnswer(optionIndex) {
+        const session = this.learningSession;
+        if (!session || session.activeBreakIndex == null) return;
+        const index = session.activeBreakIndex;
+        const item = session.mission.breaks[index];
+        const attempts = (session.breakAttempts[index] || 0) + 1;
+        session.breakAttempts[index] = attempts;
+        const correct = optionIndex === item.answer;
+        if (this.learningStore) this.learningStore.record(item.id, {
+            correct,
+            hintUsed: !!session.hintUsed[index],
+            responseTimeMs: Date.now() - session.responseStartedAt
+        });
+        if (!correct && attempts < 2) {
+            session.hintUsed[index] = true;
+            this.renderEvidenceBreak(index, `<strong>Not yet.</strong> ${item.feedback[optionIndex]} Review the hint and try once more.`);
+            return;
+        }
+        document.querySelectorAll("#learning-modal .learning-option").forEach(button => { button.disabled = true; });
+        const scaffolded = !correct;
+        this.applyEvidenceAdvantage(index);
+        session.completedBreaks.push(index);
+        session.activeBreakIndex = null;
+        const feedback = document.getElementById("learning-feedback");
+        if (feedback) feedback.innerHTML = `<strong>${scaffolded ? "Worked model:" : "Evidence accepted."}</strong> ${item.feedback[item.answer]}<div class="evidence-advantage">${item.advantage}</div><button type="button" class="learning-continue" onclick="resumeAfterEvidence()">Return to the battlefield</button>`;
+        this.updateAtlasPanel();
+    }
+
+    applyEvidenceAdvantage(index) {
+        const session = this.learningSession;
+        if (!session) return;
+        session.evidencePhase = Math.max(session.evidencePhase, index + 1);
+        if (index === 0) {
+            this.enemies.filter(enemy => enemy.bestiaryKey === session.mission.enemyType).forEach(enemy => {
+                enemy.claimShieldActive = false;
+                this.particleSystem.createShockwave(enemy.x, enemy.y, 42, "#66f2ff", 2, 1);
+            });
+            this.researchPoints += Math.round(8 * this.rpMult);
+        } else {
+            this.enemies.forEach(enemy => enemy.applySlow(0.65, 3));
+            this.researchPoints += Math.round(8 * this.rpMult);
+        }
+        this.updateSidebarUI();
+    }
+
+    resumeAfterEvidence() {
+        this.closeAccessibleModal(document.getElementById("learning-modal"));
+        this.isPaused = false;
+    }
+
+    updateAtlasPanel() {
+        const panel = document.getElementById("atlas-mission-panel");
+        if (panel) {
+            panel.hidden = !this.learningSession;
+            if (this.learningSession) {
+                const session = this.learningSession;
+                const status = document.getElementById("atlas-mission-status");
+                if (status) status.textContent = session.evidencePhase >= 2 ? "Oxygen model confirmed · CER pending" : session.evidencePhase ? "Claim shield broken · second test pending" : session.prediction != null ? "Prediction logged · collect evidence" : "Prediction pending";
+                const complete = [session.prediction != null, session.evidencePhase >= 1, session.evidencePhase >= 2];
+                panel.querySelectorAll("[data-atlas-step]").forEach((step, index) => step.classList.toggle("complete", complete[index]));
+            }
+        }
+        const count = document.getElementById("atlas-mastery-count");
+        if (count && this.learningStore) count.textContent = `${this.learningStore.evidenceCount()} learning items`;
+    }
+
+    openAtlasDebrief() {
+        const session = this.learningSession;
+        if (!session || session.debriefComplete) return false;
+        this.isPaused = true;
+        session.debriefShown = true;
+        session.responseStartedAt = Date.now();
+        const d = session.mission.debrief;
+        const select = (name, values) => `<select id="cer-${name}" aria-label="${name}"><option value="">Choose ${name}</option>${values.map((value, index) => `<option value="${index}">${value}</option>`).join("")}</select>`;
+        this.openLearningModal(`
+            <div class="learning-card cer-debrief">
+                <p class="learning-kicker">Atlas page ready to restore</p>
+                <h2 id="learning-modal-title">${d.title}</h2>
+                <p>Build the explanation that best accounts for both measurements.</p>
+                <label><strong>Claim</strong>${select("claim", d.claim)}</label>
+                <label><strong>Evidence</strong>${select("evidence", d.evidence)}</label>
+                <label><strong>Reasoning</strong>${select("reasoning", d.reasoning)}</label>
+                <button type="button" class="learning-continue" onclick="submitAtlasDebrief()">Submit explanation</button>
+                <div id="learning-feedback" class="learning-feedback" role="status" aria-live="polite"></div>
+            </div>`);
+        return true;
+    }
+
+    submitAtlasDebrief() {
+        const session = this.learningSession;
+        if (!session) return;
+        const d = session.mission.debrief;
+        const rawValues = ["claim", "evidence", "reasoning"].map(key => document.getElementById(`cer-${key}`).value);
+        const complete = rawValues.every(value => value !== "");
+        const values = rawValues.map(Number);
+        const correct = complete && values.every((value, index) => value === d.answers[index]);
+        session.debriefAttempts++;
+        if (this.learningStore) this.learningStore.record(d.id, { correct, hintUsed: session.debriefAttempts > 1, responseTimeMs: Date.now() - session.responseStartedAt });
+        const feedback = document.getElementById("learning-feedback");
+        if (!complete) {
+            if (feedback) feedback.textContent = "Choose one claim, one piece of evidence and one reasoning link.";
+            return;
+        }
+        if (!correct && session.debriefAttempts < 2) {
+            if (feedback) feedback.innerHTML = "The explanation does not yet connect both measurements. Recheck which model conserves matter and accounts for oxygen joining the metal.";
+            return;
+        }
+        this.completeAtlasDebrief(!correct);
+    }
+
+    completeAtlasDebrief(scaffolded = false) {
+        const session = this.learningSession;
+        if (!session) return;
+        session.debriefComplete = true;
+        if (this.learningStore) this.learningStore.completeMission(session.mission.id, {
+            prediction: session.prediction,
+            evidenceComplete: session.completedBreaks.length === session.mission.breaks.length,
+            cerComplete: true,
+            scaffolded
+        });
+        this.closeAccessibleModal(document.getElementById("learning-modal"));
+        this.isPaused = false;
+        this._finalizeVictory();
+    }
+
     // End-of-level housekeeping shared by victory and defeat: any open modal or
     // aim mode must not survive into the end screen / next playthrough.
     _closeBattleOverlays() {
@@ -2713,6 +2966,8 @@ class Game {
         if (qModal) qModal.style.display = "none";
         const pModal = document.getElementById("pause-modal");
         if (pModal) pModal.style.display = "none";
+        const lModal = document.getElementById("learning-modal");
+        if (lModal) lModal.style.display = "none";
         this.isTargetingItem = false;
         this.activeItemKey = null;
         this.isTargetingSkill = false;
@@ -2721,6 +2976,14 @@ class Game {
     }
 
     triggerVictory() {
+        if (this.learningSession && !this.learningSession.debriefComplete) {
+            this.openAtlasDebrief();
+            return;
+        }
+        this._finalizeVictory();
+    }
+
+    _finalizeVictory() {
         this.gameState = "victory";
         this._closeBattleOverlays();
         if (window.audioManager) window.audioManager.playStinger("victory");
@@ -2740,12 +3003,19 @@ class Game {
 
         const starStr = "★".repeat(stars) + "☆".repeat(3 - stars);
 
+        const learning = this.learningSession ? `
+            <div class="result-split learning-result">
+                <strong>Atlas of Evidence</strong>
+                <span>Claim tested · ${this.learningSession.completedBreaks.length}/${this.learningSession.mission.breaks.length} evidence breaks</span>
+                <span>Learning state: developing · review due separately from combat stars</span>
+            </div>` : "";
         document.getElementById("victory-details").innerHTML = `
-            <p>You have successfully cataloged and debunked all false theories in <strong>${this.level.name}</strong>!</p>
-            <div style="font-size:34px; color:#ffd700; letter-spacing:6px; margin:16px 0;">${starStr}</div>
-            <p style="color:#bdc3c7;">Lives remaining: ${this.lives} / ${20 + META_DEFS.find(d=>d.key==="startLives").perRank * this.meta.startLives}</p>
-            <p style="font-size:22px; color:#ffd700; font-weight:bold; margin-top:10px;">Score: ${this.score}</p>
-        `;
+            <p>You successfully defended <strong>${this.level.name}</strong>.</p>
+            <div class="result-split combat-result">
+                <strong>Combat result</strong>
+                <div style="font-size:34px; color:#ffd700; letter-spacing:6px; margin:8px 0;">${starStr}</div>
+                <span>Integrity: ${this.lives} / ${20 + META_DEFS.find(d=>d.key==="startLives").perRank * this.meta.startLives} · Score: ${this.score}</span>
+            </div>${learning}`;
 
         // Switch via the .active class system (screens are toggled by opacity/
         // position in CSS, not inline display) so the screen actually shows and
@@ -2794,6 +3064,13 @@ window.solveRush = function() {
         window.gameInstance.triggerRushQuestion();
     }
 };
+
+window.submitAtlasPrediction = index => window.gameInstance && window.gameInstance.submitAtlasPrediction(index);
+window.continueAtlasMission = () => window.gameInstance && window.gameInstance.continueAtlasMission();
+window.submitEvidenceAnswer = index => window.gameInstance && window.gameInstance.submitEvidenceAnswer(index);
+window.showEvidenceHint = () => window.gameInstance && window.gameInstance.showEvidenceHint();
+window.resumeAfterEvidence = () => window.gameInstance && window.gameInstance.resumeAfterEvidence();
+window.submitAtlasDebrief = () => window.gameInstance && window.gameInstance.submitAtlasDebrief();
 
 window.submitBranchAnswer = function(index) {
     if (window.gameInstance) {

@@ -14,7 +14,8 @@ class Enemy {
         // Generated sheets contain generous transparent padding; a larger
         // presentation multiplier keeps silhouettes legible in active waves.
         // Movement speed, health and path collision remain unchanged.
-        this.size = size * 2.25;
+        const compactPresentation = typeof window !== "undefined" && Number(window.innerWidth) <= 680 ? 1.35 : 1;
+        this.size = size * 2.65 * compactPresentation;
         this.color = color;
         this.name = name;
 
@@ -106,7 +107,8 @@ class Enemy {
         }
 
         const activeMelt = this.armorMeltTimer > 0 ? this.armorMeltFactor : 1.0;
-        const finalDamage = amount * resist * activeMelt;
+        const claimShield = this.claimShieldActive ? (this.claimShieldFactor || 0.65) : 1.0;
+        const finalDamage = amount * resist * activeMelt * claimShield;
 
         this.health -= finalDamage;
 
@@ -272,6 +274,20 @@ class Enemy {
         const rockAngle = reduceMotion ? 0 : Math.sin(this.walkWobble) * 0.08;
         ctx.rotate(rockAngle);
 
+        // Bosses need to read as crises even against dark or same-hue biomes.
+        // A silhouette halo is non-colour-only support for the persistent label
+        // below and makes Level 15's twin encounter legible as two threats.
+        if (this.isBoss) {
+            const halo = ctx.createRadialGradient(0, 0, this.size * 0.22, 0, 0, this.size * 0.7);
+            halo.addColorStop(0, "rgba(255,236,176,.24)");
+            halo.addColorStop(0.62, "rgba(255,166,74,.14)");
+            halo.addColorStop(1, "rgba(255,120,60,0)");
+            ctx.fillStyle = halo;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.72, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         // Animated walk strip → static whole image → procedural vector fallback.
         // drawSprite resolves `enemy_<key>_walk`, then a static `enemy_<key>`,
         // and returns false if no art is loaded so the vector cartoon draws instead.
@@ -323,6 +339,24 @@ class Enemy {
             ctx.restore();
         }
 
+        if (this.isBoss) {
+            ctx.save();
+            const label = this.isFinalBoss ? "FINAL BOSS" : "BOSS";
+            ctx.font = "800 9px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const labelW = Math.max(46, ctx.measureText(label).width + 14);
+            const labelY = this.y - this.size * 0.72 - 13;
+            ctx.fillStyle = "rgba(34,12,12,.94)";
+            ctx.strokeStyle = "#ffd58a";
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(this.x - labelW / 2, labelY - 7, labelW, 14);
+            ctx.strokeRect(this.x - labelW / 2, labelY - 7, labelW, 14);
+            ctx.fillStyle = "#fff4d4";
+            ctx.fillText(label, this.x, labelY + .5);
+            ctx.restore();
+        }
+
         // Draw active effect status indicators
         ctx.save();
         let offsetStatusX = -this.size * 0.35;
@@ -366,6 +400,7 @@ class Enemy {
         // `>` was intended as a fast-trait badge, but at combat scale it read
         // like a stray facial feature. A lightning glyph communicates speed.
         if (this.fast) traits.push(["⚡", "Fast"]);
+        if (this.claimShieldActive) traits.push(["E", "Untested claim shield"]);
         if (traits.length) {
             ctx.save();
             ctx.font = "bold 8px sans-serif";
@@ -1984,11 +2019,18 @@ window.BESTIARY = [
     },
     {
         key: "phlogiston",
-        name: "Phlogiston",
+        name: "Phlogiston Claim",
         role: "Swarm",
         threat: "Low",
         desc: "A fast-moving ember of the discredited fire-substance theory — released during any combustion and always eager to escape. Individually fragile but devastating in numbers.",
-        counter: "Physics chain-lightning and Astronomy AoE clear swarms; Biology splash handles stray stragglers."
+        counter: "Physics chain-lightning and Astronomy AoE clear swarms; Biology splash handles stray stragglers.",
+        dossier: {
+            claim: "Burning releases an invisible substance called phlogiston.",
+            plausibleBecause: "Flames and smoke appear to leave a material as it burns.",
+            evidence: "A sealed reacting system keeps the same total mass; heated metals gain mass as oxygen combines with them.",
+            currentModel: "Combustion is a chemical reaction with oxygen that rearranges atoms while conserving total mass.",
+            testIt: "Measure a sealed system before and after reaction, then compare a metal sample before and after heating in air."
+        }
     },
     {
         key: "spontaneous",
