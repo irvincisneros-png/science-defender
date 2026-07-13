@@ -15,9 +15,9 @@ Built with vanilla **HTML5 / CSS / JavaScript** — no build step, no dependenci
 
 - **6 tower disciplines** — Physics, Chemistry, Biology, Astronomy, Volcano, Barracks — each with a
   3-level upgrade tree and a quiz-gated specialisation fork.
-- **4 scientist heroes** — Einstein, Newton, Curie, Darwin — with passive auras, levelling (XP from
-  kills), death/respawn, and aimed active abilities (press **1–4** or the on-screen bar, then click
-  to cast).
+- **4 scientist heroes** — Einstein, Newton, Curie, Darwin — with consistent 32-frame production
+  animation sets, passive auras, levelling, death/respawn, and aimed active abilities (press **1–4**
+  or the on-screen bar, then click to cast).
 - **20 themed campaign levels** with painted backgrounds, biome-integrated route materials, safely
   distributed tower foundations, bosses at 5 / 10 / 15 / 20, plus an Endless mode.
 - **Curriculum-driven** — 225+ questions across Years 7–10, selectable by year group and topic/exam.

@@ -2428,7 +2428,8 @@ select {
     background-image: var(--hero-portrait), radial-gradient(circle at 40% 30%, #486b5f, #17352e 64%);
     background-position: left center, center;
     background-repeat: no-repeat;
-    background-size: 400% 100%, 100% 100%;
+    /* Production idle strips contain eight 128px frames; show frame one. */
+    background-size: 800% 100%, 100% 100%;
     color: var(--brass-300);
     font-size: 18px;
     box-shadow: inset 0 0 0 2px rgba(5,18,14,.52);

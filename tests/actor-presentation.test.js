@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = process.argv[2] || ".";
+const enemySource = fs.readFileSync(path.join(root, "js/enemies.js"), "utf8");
 globalThis.window = globalThis;
 globalThis.SCI_TOWER_DMG_MULT = 1;
 globalThis.SCI_HERO_HP_MULT = 1;
@@ -47,9 +48,12 @@ const hero = new globalThis.EinsteinHero(200, 180);
 const heroSprite = spriteDestinationFor(hero);
 assert(hero.size >= 84, `hero draw box regressed to ${hero.size}px`);
 assert(heroSprite.width === hero.size && heroSprite.height === hero.size, "hero sprite does not use presentation size");
-assert(Math.abs((heroSprite.y + heroSprite.height * hero.spriteFootRatio) - (hero.y + hero.groundOffset)) < 0.001,
+assert(Math.abs((heroSprite.y + heroSprite.height * hero.getSpriteFootRatio(heroSprite.state)) - (hero.y + hero.groundOffset)) < 0.001,
   "hero sprite feet are not pinned to the ground anchor");
 assert(hero.range === 110, "hero visual scale changed logical attack range");
+assert(enemySource.includes("this.size = size * 2.25"), "enemy presentation multiplier regressed below the enlarged silhouette scale");
+assert(!enemySource.includes('traits.push([\">\", \"Fast\"])'), "fast enemies still render the ambiguous > face-like badge");
+assert(enemySource.includes('traits.push([\"⚡\", \"Fast\"])'), "fast enemies lack a clear speed-trait indicator");
 
 const tower = new globalThis.PhysicsTower(320, 250);
 const originalRange = tower.range;

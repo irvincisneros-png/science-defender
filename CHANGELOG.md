@@ -5,6 +5,24 @@ Format: each entry lists **what** changed, **where** (file:line), **why** (the b
 
 ---
 
+## 2026-07-13 — Consistent hero animation and learning-design assessment
+
+- Replaced all Einstein, Newton, Curie and Darwin state art from one master model per hero, eliminating
+  costume, face, scale and hairstyle changes between idle, walking and attacks.
+- Expanded every scientist to 32 production frames: eight each for idle, walk, attack and a new
+  dedicated skill animation, packed as 128px RGBA strips with stable foot anchors.
+- Added skill-state playback priority, timestamped one-shot attacks/skills, staged skill-sheet loading,
+  eight-frame command portraits and rollout-safe legacy geometry.
+- Enlarged enemy presentation to 2.25× without changing combat collision or stats, and replaced the
+  ambiguous `>` Fast badge with a lightning indicator.
+- Added reproducible chroma-atlas packing plus a character production gate for dimensions, alpha,
+  empty frames, foot/centre drift, cross-state scale and palette/identity continuity.
+- Added a full educational assessment and a phased `Atlas of Evidence` storyline/learning roadmap.
+
+**Verified:** 72/72 gameplay checks, animation/presentation tests, all 16 hero strips passing the
+character gate, strict asset audit with 0 errors/0 warnings, and zero-warning browser checks across
+all four hero idle/skill states plus enlarged Fast enemies.
+
 ## 2026-07-13 — Biome-integrated routes and placement overhaul
 
 - Gave all 20 biomes distinct route palettes, shoulders, edge wear and deterministic material details,

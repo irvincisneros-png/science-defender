@@ -14,7 +14,7 @@ class Enemy {
         // Generated sheets contain generous transparent padding; a larger
         // presentation multiplier keeps silhouettes legible in active waves.
         // Movement speed, health and path collision remain unchanged.
-        this.size = size * 1.8;
+        this.size = size * 2.25;
         this.color = color;
         this.name = name;
 
@@ -363,7 +363,9 @@ class Enemy {
         if (this.flying) traits.push(["W", "Flying"]);
         if (this.shielded && this.shieldUp) traits.push(["S", "Shield"]);
         if (this.healer) traits.push(["+", "Healer"]);
-        if (this.fast) traits.push([">", "Fast"]);
+        // `>` was intended as a fast-trait badge, but at combat scale it read
+        // like a stray facial feature. A lightning glyph communicates speed.
+        if (this.fast) traits.push(["⚡", "Fast"]);
         if (traits.length) {
             ctx.save();
             ctx.font = "bold 8px sans-serif";

@@ -239,6 +239,9 @@ class Hero {
         
         const activated = this.activateSkillLogic(targetX, targetY, enemies, particleSystem, summonedMinions);
         if (activated) {
+            // Skills now have their own one-shot visual state instead of
+            // borrowing idle art while the ability effect happens elsewhere.
+            this._lastSkillTime = performance.now();
             this.skillCooldownTimer = this.skillCooldownMax;
             if (window.audioManager) window.audioManager.playSfx(`hero_${this.spriteKey}_skill`);
         }
@@ -400,15 +403,35 @@ class Hero {
         particleSystem.createExplosion(target.x, target.y, this.color, 6, 2.0);
     }
 
-    // Pick the sprite-sheet state: 'attack' for the duration of the attack anim
-    // after a hit, otherwise 'walk' while moving, else 'idle'.
+    // One-shot skill art takes priority, followed by attack, movement and idle.
+    // Returning the matching timestamp keeps drawSprite state-agnostic.
     getAnimState() {
+        const skillMeta = window.SHEET_META && window.SHEET_META[`hero_${this.spriteKey}_skill`];
+        if (skillMeta && this._lastSkillTime) {
+            const durMs = (skillMeta.cols / skillMeta.fps) * 1000;
+            if (performance.now() - this._lastSkillTime < durMs) return "skill";
+        }
         const meta = window.SHEET_META && window.SHEET_META[`hero_${this.spriteKey}_attack`];
         if (meta && this._lastAttackTime) {
             const durMs = (meta.cols / meta.fps) * 1000;
             if (performance.now() - this._lastAttackTime < durMs) return "attack";
         }
         return this.isMoving ? "walk" : "idle";
+    }
+
+    getAnimStart(state) {
+        if (state === "skill") return this._lastSkillTime;
+        if (state === "attack") return this._lastAttackTime;
+        return 0;
+    }
+
+    getSpriteFootRatio(state) {
+        const key = `hero_${this.spriteKey}_${state}`;
+        const meta = window.SHEET_META && window.SHEET_META[key];
+        const image = window.spriteAssets && window.spriteAssets[key];
+        if (meta && meta.legacy && image && image.naturalWidth === meta.legacy.frameW * meta.legacy.cols &&
+            image.naturalHeight === meta.legacy.frameH) return meta.legacy.footRatio;
+        return (meta && meta.footRatio) || this.spriteFootRatio;
     }
 
     draw(ctx) {
@@ -474,22 +497,24 @@ class Hero {
         // Animated sprite sheet (idle/walk/attack), mirrored when facing left.
         const baseKey = `hero_${this.spriteKey}`;
         const state = this.getAnimState();
+        const animationStart = this.getAnimStart(state);
         const dw = this.size, dh = this.size;
         const dx = this.x - dw / 2;
         // All production hero sheets share a bottom opaque pixel at y=57.
         // Pin that foot line to the gameplay ground point instead of centering
         // the transparent 64px cell around it.
-        const dy = this.y + this.groundOffset - dh * this.spriteFootRatio;
+        const footRatio = this.getSpriteFootRatio(state);
+        const dy = this.y + this.groundOffset - dh * footRatio;
         let drawn;
         if (this.faceLeft) {
             ctx.save();
             ctx.translate(this.x, 0);
             ctx.scale(-1, 1);
             ctx.translate(-this.x, 0);
-            drawn = window.drawSprite(ctx, baseKey, state, dx, dy, dw, dh, this._lastAttackTime);
+            drawn = window.drawSprite(ctx, baseKey, state, dx, dy, dw, dh, animationStart);
             ctx.restore();
         } else {
-            drawn = window.drawSprite(ctx, baseKey, state, dx, dy, dw, dh, this._lastAttackTime);
+            drawn = window.drawSprite(ctx, baseKey, state, dx, dy, dw, dh, animationStart);
         }
 
         if (!drawn) {

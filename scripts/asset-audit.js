@@ -53,7 +53,12 @@ function jpegDimensions(buffer) {
 function expectedCell(assetPath) {
   const name = path.basename(assetPath, ".png");
   if (assetPath.includes("/levels/")) return { width: 1800, height: 1100, exact: true, kind: "level" };
-  if (assetPath.includes("/heroes/")) return { width: 64, height: 64, exact: false, kind: "hero strip" };
+  if (assetPath.includes("/heroes/") && /^(einstein|newton|curie|darwin)_(idle|walk|attack|skill)$/.test(name)) {
+    const state = name.slice(name.lastIndexOf("_") + 1);
+    const cols = 8;
+    return { width: 128 * cols, height: 128, exact: true, kind: `production hero ${state} strip` };
+  }
+  if (assetPath.includes("/heroes/")) return { width: 64, height: 64, exact: false, kind: "support-unit strip" };
   if (assetPath.includes("/towers/")) return { width: 128, height: 128, exact: false, kind: "tower strip" };
   if (assetPath.includes("/enemies/")) {
     const cell = name.startsWith("boss_") ? 128 : 64;
