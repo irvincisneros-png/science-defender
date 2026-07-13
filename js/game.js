@@ -49,18 +49,29 @@ const ASSETS_MANIFEST = {
 // procedural vector art — so partially-delivered art is always safe.
 window.SHEET_META = {};
 (function buildSheetMeta() {
-    const HEROES = ["einstein", "newton", "curie", "darwin", "tortoise"];
+    // Production scientists use a single 128px character model across every
+    // state. `legacy` keeps the renderer compatible with the original 64px
+    // strips while regenerated art is rolled out; it is not used when the
+    // production dimensions match. This prevents a partial deployment from
+    // slicing old sheets into half-frames.
+    const HEROES = ["einstein", "newton", "curie", "darwin"];
     const HERO_STATES = {
-        idle:   { cols: 4, fps: 6,  loop: true  },
-        walk:   { cols: 8, fps: 12, loop: true  },
-        attack: { cols: 6, fps: 14, loop: false },
+        idle:   { frameW: 128, frameH: 128, cols: 8,  fps: 7,  loop: true,  footRatio: 0.92, legacy: { frameW: 64, frameH: 64, cols: 4, footRatio: 58 / 64 } },
+        walk:   { frameW: 128, frameH: 128, cols: 8,  fps: 12, loop: true,  footRatio: 0.92, legacy: { frameW: 64, frameH: 64, cols: 8, footRatio: 58 / 64 } },
+        attack: { frameW: 128, frameH: 128, cols: 8,  fps: 14, loop: false, footRatio: 0.92, legacy: { frameW: 64, frameH: 64, cols: 6, footRatio: 58 / 64 } },
+        skill:  { frameW: 128, frameH: 128, cols: 8,  fps: 15, loop: false, footRatio: 0.92 },
     };
+    window.HERO_ANIMATION_SCHEMA = HERO_STATES;
     HEROES.forEach(h => Object.entries(HERO_STATES).forEach(([state, cfg]) => {
-        if (h === "tortoise" && state === "attack") return; // tortoise has no attack sheet
         const key = `hero_${h}_${state}`;
         ASSETS_MANIFEST[key] = `assets/heroes/${h}_${state}.png`;
-        window.SHEET_META[key] = { frameW: 64, frameH: 64, ...cfg };
+        window.SHEET_META[key] = { ...cfg };
     }));
+    [["idle", 4, 6], ["walk", 8, 12]].forEach(([state, cols, fps]) => {
+        const key = `hero_tortoise_${state}`;
+        ASSETS_MANIFEST[key] = `assets/heroes/tortoise_${state}.png`;
+        window.SHEET_META[key] = { frameW: 64, frameH: 64, cols, fps, loop: true };
+    });
 
     const TOWERS = ["physics", "chemistry", "biology", "astronomy", "volcano", "barracks"];
     const TIERS = ["1", "3", "4"];
@@ -143,9 +154,9 @@ if (typeof window !== "undefined") window.ASSETS_MANIFEST = ASSETS_MANIFEST;
 // Draw one frame of an animated strip into (dx,dy,dw,dh). Resolves the key
 // `${baseKey}_${state}`, falling back to the `_idle` sheet, then to a static
 // whole image named `baseKey`. Returns false if nothing could be drawn, so the
-// caller can run its procedural vector fallback. `attackStart` (ms from
-// performance.now()) drives one-shot (loop:false) anims.
-window.drawSprite = function (ctx, baseKey, state, dx, dy, dw, dh, attackStart) {
+// caller can run its procedural vector fallback. `animationStart` (ms from
+// performance.now()) drives one-shot attack/skill animations.
+window.drawSprite = function (ctx, baseKey, state, dx, dy, dw, dh, animationStart) {
     const assets = window.spriteAssets || {};
     const metas = window.SHEET_META || {};
     let key = `${baseKey}_${state}`;
@@ -155,16 +166,22 @@ window.drawSprite = function (ctx, baseKey, state, dx, dy, dw, dh, attackStart) 
     if (!img || !img.complete || img.naturalWidth === 0) return false;                     // → vector fallback
     if (!meta) { ctx.drawImage(img, dx, dy, dw, dh); return true; }
 
+    // A legacy descriptor is selected only for an exact legacy sheet match.
+    // Otherwise the production schema remains authoritative and malformed art
+    // is caught by the asset audit rather than silently animated incorrectly.
+    const legacy = meta.legacy;
+    const geometry = legacy && img.naturalWidth === legacy.frameW * legacy.cols && img.naturalHeight === legacy.frameH
+        ? legacy : meta;
     let frame;
     if (meta.loop === false) {
-        const elapsed = performance.now() - (attackStart || 0);
+        const elapsed = performance.now() - (animationStart || 0);
         frame = Math.floor(elapsed * meta.fps / 1000);
         if (frame < 0) frame = 0;
-        if (frame > meta.cols - 1) frame = meta.cols - 1; // hold last frame
+        if (frame > geometry.cols - 1) frame = geometry.cols - 1; // hold last frame
     } else {
-        frame = Math.floor(performance.now() * meta.fps / 1000) % meta.cols;
+        frame = Math.floor(performance.now() * meta.fps / 1000) % geometry.cols;
     }
-    ctx.drawImage(img, frame * meta.frameW, 0, meta.frameW, meta.frameH, dx, dy, dw, dh);
+    ctx.drawImage(img, frame * geometry.frameW, 0, geometry.frameW, geometry.frameH, dx, dy, dw, dh);
     return true;
 };
 
@@ -403,7 +420,7 @@ class Game {
         const heroRoster = ["einstein", "curie", "newton", "darwin"];
         const heroes = [heroRoster[levelId % heroRoster.length]];
         if (levelId >= 3) heroes.push(heroRoster[(levelId + 2) % heroRoster.length]);
-        heroes.forEach(hero => ["idle", "walk", "attack"].forEach(state => keys.add(`hero_${hero}_${state}`)));
+        heroes.forEach(hero => ["idle", "walk", "attack", "skill"].forEach(state => keys.add(`hero_${hero}_${state}`)));
         if (heroes.includes("darwin")) ["idle", "walk"].forEach(state => keys.add(`hero_tortoise_${state}`));
         return [...keys].filter(key => ASSETS_MANIFEST[key]);
     }

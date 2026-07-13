@@ -13,6 +13,11 @@ const output = execFileSync(process.execPath, [path.join(root, "scripts/asset-au
 });
 const report = JSON.parse(output);
 
+execFileSync(process.execPath, [path.join(root, "scripts/character-asset-audit.js")], {
+  cwd: root,
+  stdio: "inherit",
+});
+
 assert(report.totalFiles >= 90, "asset inventory unexpectedly small");
 assert(report.totalBytes > 50 * 1024 * 1024, "asset byte total unexpectedly small");
 assert(report.byExtension.png.files >= 80, "PNG inventory unexpectedly small");
