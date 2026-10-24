@@ -1167,6 +1167,19 @@ check("target selection uses one-pass squared-distance semantics", () => {
   globalThis.SCI_PERF = null;
 });
 
+check("v3 art pilot is opt-in and every pilot asset exists", () => {
+  if (globalThis.ART_PILOT) throw new Error("pilot art must be off unless ?art=pilot is used");
+  if (globalThis.ASSETS_MANIFEST.bg_level_0 !== "assets/levels/lab.webp") throw new Error("classic Level 1 art must stay the default");
+  const pilotDir = J("assets/pilot");
+  ["lab.webp", "einstein_idle.png", "einstein_walk.png", "einstein_attack.png", "einstein_skill.png",
+   "flatearth_walk.png", "phlogiston_walk.png", "physics_idle.png", "physics_attack.png"].forEach(f => {
+    if (!fs.existsSync(path.join(pilotDir, f))) throw new Error(`missing assets/pilot/${f}`);
+  });
+  const g = new globalThis.Game();
+  g.level = { id: 0 };
+  if (globalThis.isArtPilotLevel(g.level)) throw new Error("pilot styling must not apply when the pilot is off");
+});
+
 // ---- Report ---------------------------------------------------------------
 let pass = 0;
 for (const [ok, name, msg] of results) {
