@@ -1167,6 +1167,88 @@ check("target selection uses one-pass squared-distance semantics", () => {
   globalThis.SCI_PERF = null;
 });
 
+// ===========================================================================
+// Sprint 1 (2026-10-24 audit): honest quiz economy.
+// ===========================================================================
+
+check("answer options are shuffled per draw and the answer index follows its text", () => {
+  const qm = new globalThis.QuestionManager();
+  qm.setSelection(8, "yearly");
+  const byId = new Map(qm.activePool.map(q => [q.id, q]));
+  const slots = [0, 0, 0, 0];
+  for (let i = 0; i < 800; i++) {
+    const q = qm.getRandomQuestion();
+    const src = byId.get(q.id);
+    if (q.o[q.a] !== src.o[src.a]) throw new Error("shuffled answer index points at the wrong option");
+    if ([...q.o].sort().join("|") !== [...src.o].sort().join("|")) throw new Error("shuffle lost or duplicated options");
+    if (q.o.length === 4) slots[q.a]++;
+  }
+  const total = slots.reduce((s, n) => s + n, 0);
+  if (slots.some(n => n / total < 0.15)) throw new Error(`answer slots still biased: ${slots.join(",")}`);
+  if (byId.get(qm.activePool[0].id) !== qm.activePool[0]) throw new Error("pool must not be mutated");
+});
+
+check("level start opens a timed setup break that auto-starts wave 1", () => {
+  const g = new globalThis.Game();
+  g.startLevel(1);
+  g.learningSession = null; g.isPaused = false; // skip any Atlas briefing
+  if (g.nextWaveCountdown !== g.FIRST_WAVE_COUNTDOWN_FRAMES) throw new Error("wave 1 countdown should start on level load");
+  if (!g.breakQuizReady) throw new Error("setup break should offer a quiz");
+  if (g.earlyCallBonus(g.nextWaveCountdown) !== 0) throw new Error("calling wave 1 early must not pay gold");
+  g.nextWaveCountdown = 1;
+  g.update();
+  if (!g.isWaveActive || g.waveNumber !== 1) throw new Error("wave 1 should auto-start when the countdown ends");
+});
+
+check("one quiz per break; wrong answers pay nothing; none during waves", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing";
+  g.level = JSON.parse(JSON.stringify(globalThis.LEVEL_DATA[0]));
+  g.isWaveActive = false; g.waveNumber = 1; g.nextWaveCountdown = 600; g.breakQuizReady = true;
+  g.gold = 0; g.researchPoints = 0;
+  g.triggerQuestionPopup();
+  const first = g.currentActiveQuestion;
+  if (g.breakQuizReady) throw new Error("opening a question should spend the break's quiz");
+  g.solveAnswer((first.a + 1) % first.o.length);
+  if (g.gold !== 0 || g.researchPoints !== 0) throw new Error("wrong answer must not pay gold or RP");
+  g.triggerQuestionPopup();
+  if (g.currentActiveQuestion !== first) throw new Error("second question in the same break must be refused");
+  g.triggerRushQuestion();
+  if (g.currentRushQuestion) throw new Error("Solve to Rush must share the break's single quiz");
+  g.isWaveActive = true; g.breakQuizReady = true;
+  g.triggerQuestionPopup();
+  if (g.currentActiveQuestion !== first) throw new Error("no questions during an active wave");
+});
+
+check("starting a wave expires the quiz; clearing it re-arms the next break", () => {
+  const g = new globalThis.Game();
+  g.gameState = "playing";
+  g.level = JSON.parse(JSON.stringify(globalThis.LEVEL_DATA[0]));
+  g.isWaveActive = false; g.waveNumber = 0; g.breakQuizReady = true;
+  g.heroes = []; g.summonedMinions = [];
+  g.ideaBubbles = [{ x: 0, y: 0, radius: 18 }];
+  g.startNextWave(false);
+  if (g.breakQuizReady || g.ideaBubbles.length) throw new Error("wave start should expire the quiz and bubbles");
+  g.spawnQueue = []; g.enemies = []; g.learningSession = null;
+  g.update();
+  if (g.isWaveActive || !g.breakQuizReady) throw new Error("wave clear should re-arm one quiz for the break");
+});
+
+check("Atlas Evidence Break II slows misconceptions that spawn after the break", () => {
+  const g = new globalThis.Game();
+  g.startLevel(2);
+  // learning.js isn't loaded in this harness; a minimal session is enough.
+  const mission = { enemyType: "phlogiston", breaks: [{ wave: 2 }, { wave: 4 }] };
+  g.learningSession = { mission, evidencePhase: 0 };
+  g.enemies = [];
+  g.applyEvidenceAdvantage(0);
+  g.applyEvidenceAdvantage(1);
+  g.spawnEnemy(mission.enemyType);
+  const e = g.enemies[0];
+  if (!(e.slowTimer > 0 && e.slowFactor < 1)) throw new Error("post-break misconceptions should arrive slowed");
+  if (e.claimShieldActive) throw new Error("claim shield should stay broken");
+});
+
 // ---- Report ---------------------------------------------------------------
 let pass = 0;
 for (const [ok, name, msg] of results) {

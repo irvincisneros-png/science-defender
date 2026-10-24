@@ -58,7 +58,7 @@ node tests/bug-regression.test.js
 node tests/tooling-validation.test.js
 ```
 
-The current regression baseline includes **72 gameplay checks** plus focused learning-flow, animation,
+The current regression baseline includes **77 gameplay checks** plus focused learning-flow, animation,
 environment and tooling tests. Tooling validation also runs regular and boss sprite QA and a
 20-level route/pad coverage report.
 
