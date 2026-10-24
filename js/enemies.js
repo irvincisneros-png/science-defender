@@ -291,9 +291,11 @@ class Enemy {
         // Animated walk strip → static whole image → procedural vector fallback.
         // drawSprite resolves `enemy_<key>_walk`, then a static `enemy_<key>`,
         // and returns false if no art is loaded so the vector cartoon draws instead.
+        // drawScale enlarges the sprite only (v3 art pilot); hit size is unchanged.
+        const spriteSize = this.size * (this.drawScale || 1);
         const drawn = window.drawSprite
             ? window.drawSprite(ctx, `enemy_${this.spriteKey}`, "walk",
-                  -this.size / 2, -this.size / 2, this.size, this.size)
+                  -spriteSize / 2, this.size / 2 - spriteSize, spriteSize, spriteSize)
             : false;
         if (!drawn) {
             // High fidelity vector cartoon drawing fallbacks

@@ -1219,6 +1219,10 @@ class LevelManager {
     // Drawn once into the path cache, so the richer treatment remains free.
     static _renderPathLayers(ctx, path, pathColor, accentColor) {
         const level = LEVEL_DATA.find(candidate => candidate.pathColor === pathColor);
+        if (typeof window !== "undefined" && window.isArtPilotLevel && window.isArtPilotLevel(level)) {
+            LevelManager._renderCartoonPath(ctx, path);
+            return;
+        }
         const material = (level && level.pathMaterial) || {
             body: pathColor, worn: "rgba(255,255,255,.08)", shoulder: "rgba(12,8,20,.55)",
             edge: "rgba(0,0,0,.24)", detail: accentColor, texture: "pavers"
@@ -1277,6 +1281,57 @@ class LevelManager {
 
         ctx.globalAlpha = 1;
         LevelManager._drawPathTexture(ctx, path, material);
+        ctx.restore();
+    }
+
+    // v3 style-bible road: the lightest surface on screen, cream pavers with a
+    // bold ink outline and a soft floor-tinted shoulder (docs/style-bible.md §5).
+    static _renderCartoonPath(ctx, path) {
+        const trace = () => {
+            if (path && typeof path.trace === "function") path.trace(ctx);
+            else {
+                ctx.beginPath();
+                path.forEach((wp, index) => index ? ctx.lineTo(wp.x, wp.y) : ctx.moveTo(wp.x, wp.y));
+            }
+        };
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        trace();
+        ctx.strokeStyle = "rgba(46, 92, 86, 0.35)"; // shoulder shadow, offset by the key light
+        ctx.lineWidth = 62;
+        ctx.save(); ctx.translate(3, 5); ctx.stroke(); ctx.restore();
+        ctx.strokeStyle = "#1E1630";
+        ctx.lineWidth = 54;
+        ctx.stroke();
+        ctx.strokeStyle = "#D6CCB2";
+        ctx.lineWidth = 48;
+        ctx.stroke();
+        ctx.strokeStyle = "#EDE6D3";
+        ctx.lineWidth = 42;
+        ctx.stroke();
+        // Hard highlight along the top-left edge of the paving.
+        ctx.save(); ctx.translate(-2, -3);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.lineWidth = 6;
+        ctx.setLineDash([26, 14]);
+        ctx.stroke();
+        ctx.restore();
+
+        // Cross-road paver seams.
+        const samples = path && Array.isArray(path.samples) ? path.samples : [];
+        ctx.strokeStyle = "rgba(160, 145, 118, 0.75)";
+        ctx.lineWidth = 2;
+        for (let i = 4; i < samples.length - 4; i += 4) {
+            const p = samples[i];
+            const before = samples[i - 2], after = samples[i + 2];
+            const angle = Math.atan2(after.y - before.y, after.x - before.x);
+            const nx = -Math.sin(angle), ny = Math.cos(angle);
+            ctx.beginPath();
+            ctx.moveTo(p.x - nx * 19, p.y - ny * 19);
+            ctx.lineTo(p.x + nx * 19, p.y + ny * 19);
+            ctx.stroke();
+        }
         ctx.restore();
     }
 

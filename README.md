@@ -34,6 +34,11 @@ Built with vanilla **HTML5 / CSS / JavaScript** — no build step, no dependenci
   generated 128px progression art for all 6 tower families, illustrated battlefield objectives,
   enlarged scientist heroes, blocker troops, and an original outlined HUD icon family.
 
+## Art pilot
+
+A new outlined-cartoon art direction ([style bible](docs/style-bible.md)) is being piloted on Level 1.
+Add `?art=pilot` to the URL to try it (remembered on that device); `?art=classic` switches back.
+
 ## Run locally
 
 No build needed — it's static files. Serve the folder with any static server:
@@ -58,7 +63,7 @@ node tests/bug-regression.test.js
 node tests/tooling-validation.test.js
 ```
 
-The current regression baseline includes **72 gameplay checks** plus focused learning-flow, animation,
+The current regression baseline includes **73 gameplay checks** plus focused learning-flow, animation,
 environment and tooling tests. Tooling validation also runs regular and boss sprite QA and a
 20-level route/pad coverage report.
 

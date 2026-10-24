@@ -149,6 +149,38 @@ window.SHEET_META = {};
         path_surface_academy: "assets/paths/academy_pavers.webp",
     });
 })();
+
+// ---- v3 "Bright Expedition" art pilot (docs/style-bible.md) ---------------
+// Opt-in A/B switch: ?art=pilot turns it on (remembered), ?art=classic turns it
+// off. The pilot restyles Level 1's floor, road and pads plus the actors that
+// appear there; everything else keeps the classic art until the pilot is approved.
+window.ART_PILOT = (function () {
+    let choice = null;
+    try {
+        const param = new URLSearchParams(window.location.search).get("art");
+        if (param === "pilot" || param === "classic") localStorage.setItem("sd_art_style", param);
+        choice = param || localStorage.getItem("sd_art_style");
+    } catch (_) { /* file:// or blocked storage: classic */ }
+    return choice === "pilot";
+})();
+window.ART_PILOT_LEVELS = [0];
+(function applyArtPilot() {
+    if (!window.ART_PILOT) return;
+    ASSETS_MANIFEST.bg_level_0 = "assets/pilot/lab.webp";
+    ["idle", "walk", "attack", "skill"].forEach(state => {
+        ASSETS_MANIFEST[`hero_einstein_${state}`] = `assets/pilot/einstein_${state}.png`;
+    });
+    ["flatearth", "phlogiston"].forEach(e => {
+        const key = `enemy_${e}_walk`;
+        ASSETS_MANIFEST[key] = `assets/pilot/${e}_walk.png`;
+        window.SHEET_META[key] = { frameW: 128, frameH: 128, cols: 6, fps: 10, loop: true };
+    });
+    // One tower design stands in for all three tiers during the pilot.
+    ["1", "3", "4"].forEach(tier => ["idle", "attack"].forEach(state => {
+        ASSETS_MANIFEST[`tower_physics_${tier}_${state}`] = `assets/pilot/physics_${state}.png`;
+    }));
+})();
+window.isArtPilotLevel = level => !!(window.ART_PILOT && level && window.ART_PILOT_LEVELS.includes(level.id));
 if (typeof window !== "undefined") window.ASSETS_MANIFEST = ASSETS_MANIFEST;
 
 // Draw one frame of an animated strip into (dx,dy,dw,dh). Resolves the key
@@ -1276,6 +1308,7 @@ class Game {
         else enemy = new FlatEarthEnemy(wp[0].x, wp[0].y, scale);
 
         enemy.bestiaryKey = type;
+        if (window.isArtPilotLevel(this.level)) enemy.drawScale = 1.7;
         if (this.learningSession && type === this.learningSession.mission.enemyType && this.learningSession.evidencePhase < 1) {
             enemy.claimShieldActive = true;
             enemy.claimShieldFactor = 0.65;
@@ -1582,6 +1615,10 @@ class Game {
                     const blocked = !!s.occupied;
                     const canAfford = !placement || (this.gold >= placement.cost && placement.sameType < this.MAX_PER_TYPE);
                     const pulse = focused && !this.reducedMotion ? 1 + Math.sin(performance.now() / 180) * 0.08 : 1;
+                    if (window.isArtPilotLevel(this.level)) {
+                        this.drawCartoonPad(s, r * pulse, { focused, blocked, active, canAfford, valid: placement && placement.valid });
+                        return;
+                    }
                     this.ctx.save();
                     this.ctx.fillStyle = "rgba(5, 12, 18, 0.6)";
                     this.ctx.beginPath();
@@ -2290,6 +2327,55 @@ class Game {
         this.gameSpeed = this.gameSpeed === 1 ? 2 : 1;
         this.refreshWaveButton();
         this.showInGameNotification(`Speed: ${this.gameSpeed}×`);
+    }
+
+    // v3 style-bible build pad: light stone disc, ink outline, cyan build glyph
+    // (docs/style-bible.md §5). Placement feedback swaps the rim colour.
+    drawCartoonPad(s, r, state) {
+        const ctx = this.ctx;
+        const rim = state.focused ? (state.valid ? "#3EE08F" : "#FF7A5C")
+            : state.active ? (state.canAfford ? "#3EE08F" : "#B9A27A") : "#1E1630";
+        ctx.save();
+        ctx.fillStyle = "rgba(30, 22, 48, 0.28)";
+        ctx.beginPath();
+        ctx.ellipse(s.x + 3, s.y + 6, r + 3, r * 0.62 + 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#1E1630";
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r + 3, r * 0.62 + 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = state.blocked ? "#A9B2B0" : "#E7E2D6";
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.62, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#C9C1AE"; // one shadow step on the lower half
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, r, r * 0.62, 0, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = state.blocked ? "#A9B2B0" : "#F4F0E6";
+        ctx.beginPath();
+        ctx.ellipse(s.x - 1, s.y - 2, r * 0.78, r * 0.44, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (rim !== "#1E1630") {
+            ctx.strokeStyle = rim;
+            ctx.lineWidth = state.focused ? 4 : 3;
+            ctx.beginPath();
+            ctx.ellipse(s.x, s.y, r + 3, r * 0.62 + 3, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        if (!state.blocked) {
+            // Build glyph: chunky cyan plus with an ink outline.
+            ctx.lineCap = "round";
+            ["#1E1630", "#4FE3FF"].forEach((colour, pass) => {
+                ctx.strokeStyle = colour;
+                ctx.lineWidth = pass ? 3.5 : 6.5;
+                ctx.beginPath();
+                ctx.moveTo(s.x - 7, s.y - 2); ctx.lineTo(s.x + 7, s.y - 2);
+                ctx.moveTo(s.x, s.y - 6.5); ctx.lineTo(s.x, s.y + 2.5);
+                ctx.stroke();
+            });
+        }
+        ctx.restore();
     }
 
     showTowerUpgradeMenu(tower) {

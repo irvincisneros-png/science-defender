@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-24 — v3 "Bright Expedition" art pilot (Level 1, opt-in)
+
+- Added `docs/style-bible.md`: one outlined-cartoon style (ink outlines, flat colour + one shadow step,
+  bright daylight palette, 3/4 top-down camera, right-facing source art, magenta-key production rules).
+- Level 1 pilot behind `?art=pilot` (remembered; `?art=classic` turns it off). Classic art stays the default.
+  New `assets/pilot/`: lab floor background, Einstein (idle/walk/attack/skill), Flat Earth and Phlogiston
+  walk cycles (128 px, right-facing, so they no longer moonwalk), Physics Tesla coil idle/attack.
+- Code-drawn cartoon road (`LevelManager._renderCartoonPath`) and build pads (`Game.drawCartoonPad`) for
+  pilot levels; pilot enemies draw at 1.7× sprite scale (hitboxes unchanged, `Enemy.drawScale`).
+- New `scripts/pack-pilot-sheet.py`: keys magenta, finds poses, one scale per sheet (no size pulsing),
+  plinth/feet anchoring, edge-sliver cleanup, frame remapping.
+- Also adds the art audit and Realm Defense comparison docs with evidence screenshots.
+- Verified: all six test files pass (bug-regression 73/73 incl. a pilot opt-in check), asset audit clean,
+  Level 1 played at 844×390 with towers firing and both enemies walking right.
+
 ## 2026-07-13 — Atlas of Evidence vertical slice
 
 - Added a Level 3 phlogiston mission that moves through prediction, two battlefield evidence breaks,
