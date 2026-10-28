@@ -257,7 +257,10 @@ class Game {
         this.gameSpeed = 1;              // 1x or 2x fast-forward
         this.nextWaveCountdown = 0;      // frames until next wave auto-starts (0 = idle)
         this.WAVE_COUNTDOWN_FRAMES = 720; // ~12s between waves
+        this.FIRST_WAVE_COUNTDOWN_FRAMES = 1800; // ~30s setup before wave 1 auto-starts
         this.EARLY_CALL_GOLD_PER_SEC = 8; // bonus gold per second of countdown skipped
+        // One quiz (bubble, Research Question or Solve to Rush) per break.
+        this.breakQuizReady = false;
         this.MAX_PER_TYPE = 3;            // placement cap per tower type (anti-dominant-tower)
 
         // Entities lists
@@ -632,7 +635,9 @@ class Game {
         this.waveNumber = 0;
         this.isWaveActive = false;
         this.isPaused = false;
-        this.nextWaveCountdown = 0;
+        // Setup phase is a timed break like any other: wave 1 auto-starts.
+        this.nextWaveCountdown = this.FIRST_WAVE_COUNTDOWN_FRAMES;
+        this.breakQuizReady = true;
         this.gameSpeed = 1;
         this.gameClock.reset();
 
@@ -1163,13 +1168,19 @@ class Game {
     //   - Active wave with waves remaining: RUSH the next wave on top of the
     //     current one (Realm Defense-style overlap) for a flat gold bonus.
     //   - Active final wave: nothing to call.
+    // Gold for skipping the rest of a countdown. The pre-wave-1 setup pays
+    // nothing, otherwise every level would open with a free ~240G.
+    earlyCallBonus(countdownFrames) {
+        if (this.waveNumber === 0) return 0;
+        return Math.ceil(countdownFrames / 60) * this.EARLY_CALL_GOLD_PER_SEC;
+    }
+
     callOrStartWave() {
         if (this.gameState !== "playing") return;
 
         if (!this.isWaveActive) {
-            if (this.nextWaveCountdown > 0) {
-                const secLeft = Math.ceil(this.nextWaveCountdown / 60);
-                const bonus = secLeft * this.EARLY_CALL_GOLD_PER_SEC;
+            const bonus = this.earlyCallBonus(this.nextWaveCountdown);
+            if (bonus > 0) {
                 this.gold += bonus;
                 this.particleSystem.addFloatingText(GAME_WIDTH / 2, 90, `Early Call! +${bonus}G`, "#ffd700", 18, 1.5);
             }
@@ -1189,6 +1200,9 @@ class Game {
         if (this.isWaveActive && !append) return;
 
         this.nextWaveCountdown = 0;
+        // The break is over: unused quiz chances and bubbles expire.
+        this.breakQuizReady = false;
+        this.ideaBubbles = [];
 
         // Heal heroes and summoned blockers at the start of each wave.
         this.heroes.forEach(h => { h.health = h.maxHealth; });
@@ -1280,6 +1294,10 @@ class Game {
             enemy.claimShieldActive = true;
             enemy.claimShieldFactor = 0.65;
         }
+        // Evidence Break II: confirmed oxygen model slows each misconception as it arrives.
+        if (this.learningSession && type === this.learningSession.mission.enemyType && this.learningSession.evidencePhase >= 2) {
+            enemy.applySlow(0.65, 3);
+        }
         enemy.setPath(this.level.route);
         this.enemies.push(enemy);
         this.recordBestiaryEncounter(type);
@@ -1342,6 +1360,7 @@ class Game {
             } else {
                 // Start the between-wave countdown (Call Wave skips it for a bonus).
                 this.nextWaveCountdown = this.WAVE_COUNTDOWN_FRAMES;
+                this.breakQuizReady = true;
                 this.maybeOpenEvidenceBreak(this.waveNumber);
             }
 
@@ -1363,8 +1382,9 @@ class Game {
         // 2. Flying question bubble spawning
         this.bubbleSpawnTimer--;
         if (this.bubbleSpawnTimer <= 0) {
-            if (this.isWaveActive) {
-                // Reading is concentrated in setup and between-wave phases.
+            if (this.isWaveActive || !this.breakQuizReady) {
+                // Reading is concentrated in setup and between-wave phases,
+                // and each break offers a single question.
                 this.bubbleSpawnTimer = 180;
             } else {
             this.ideaBubbles.push({
@@ -2269,9 +2289,11 @@ class Game {
             }
         } else if (this.nextWaveCountdown > 0) {
             const secLeft = Math.ceil(this.nextWaveCountdown / 60);
-            const bonus = secLeft * this.EARLY_CALL_GOLD_PER_SEC;
+            const bonus = this.earlyCallBonus(this.nextWaveCountdown);
             wBtn.disabled = false;
-            wBtn.textContent = `Call Wave (${secLeft}s · +${bonus}G)`;
+            wBtn.textContent = this.waveNumber === 0
+                ? `Start First Wave (${secLeft}s)`
+                : `Call Wave (${secLeft}s · +${bonus}G)`;
         } else {
             wBtn.disabled = false;
             wBtn.textContent = this.waveNumber === 0 ? "Start First Wave" : "Start Next Wave";
@@ -2281,9 +2303,12 @@ class Game {
         const sBtn = document.getElementById("speed-btn");
         if (sBtn) sBtn.textContent = this.gameSpeed === 2 ? "▶▶ 2×" : "▶ 1×";
 
-        // "Solve to Rush" only makes sense during the between-wave countdown.
+        // Quizzes only make sense during a break, and only once per break.
+        const quizOpen = !this.isWaveActive && this.nextWaveCountdown > 0 && this.breakQuizReady;
         const rBtn = document.getElementById("solve-rush-btn");
-        if (rBtn) rBtn.style.display = (!this.isWaveActive && this.nextWaveCountdown > 0) ? "block" : "none";
+        if (rBtn) rBtn.style.display = quizOpen ? "block" : "none";
+        const qBtn = document.getElementById("research-question-btn");
+        if (qBtn) qBtn.disabled = !quizOpen;
     }
 
     toggleGameSpeed() {
@@ -2601,12 +2626,26 @@ class Game {
         else if (this.canvas && this.canvas.focus) this.canvas.focus();
     }
 
+    // Spends this break's single quiz chance. Claimed when the question opens
+    // (not when answered) so closing the modal can't reroll for an easier one.
+    claimBreakQuiz() {
+        if (!this.breakQuizReady) {
+            this.showInGameNotification("One research question per break. Next one after this wave.");
+            return false;
+        }
+        this.breakQuizReady = false;
+        this.ideaBubbles = [];
+        this.refreshWaveButton();
+        return true;
+    }
+
     // Floating bubble question modal
     triggerQuestionPopup() {
         if (this.isWaveActive) {
             this.showInGameNotification("Research questions open during setup or between waves.");
             return;
         }
+        if (!this.claimBreakQuiz()) return;
         this.isPaused = true;
         const modal = document.getElementById("question-modal");
         const qObj = this.questionManager.getRandomQuestion();
@@ -2662,12 +2701,8 @@ class Game {
                 <span style="color:#ff3333; font-weight:bold;">✗ INCORRECT.</span><br>
                 <p>Correct answer: <strong>${this.currentActiveQuestion.o[this.currentActiveQuestion.a]}</strong></p>
                 <p>${this.currentActiveQuestion.exp}</p>
+                <p style="color:#bdc3c7;">No reward this break. Another question opens after the next wave.</p>
             `;
-            
-            // small penalty / no rewards
-            this.gold += 20; // consolidation prize
-            this.researchPoints += Math.round(2 * this.rpMult);
-            this.particleSystem.addFloatingText(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, "+20 Gold", "#ffd700", 13);
         }
         
         this.updateSidebarUI();
@@ -2676,9 +2711,11 @@ class Game {
     // ---- Gap 4: between-wave "Solve to Rush" -------------------------------
     // Only valid during the between-wave countdown. Answering correctly calls
     // the next wave early with DOUBLE the early-call gold bonus and heals the
-    // heroes/summons. Answering wrong costs nothing — the countdown resumes.
+    // heroes/summons. Answering wrong pays nothing and uses up the break's
+    // question; the countdown resumes.
     triggerRushQuestion() {
         if (this.gameState !== "playing" || this.isWaveActive || this.nextWaveCountdown <= 0) return;
+        if (!this.claimBreakQuiz()) return;
         this.isPaused = true;
         const modal = document.getElementById("question-modal");
         const qObj = this.questionManager.getRandomQuestion();
@@ -2716,8 +2753,7 @@ class Game {
         if (window.audioManager) window.audioManager.playSfx(correct ? "quiz_correct" : "quiz_wrong");
 
         if (correct) {
-            const secLeft = Math.ceil((this.rushCountdownSnapshot || 0) / 60);
-            const bonus = secLeft * this.EARLY_CALL_GOLD_PER_SEC * 2; // double early-call bonus
+            const bonus = this.earlyCallBonus(this.rushCountdownSnapshot || 0) * 2; // double early-call bonus
             this.gold += bonus;
             this.researchPoints += Math.round(10 * this.rpMult);
             feedback.innerHTML = `<span style="color:#00ff66; font-weight:bold;">✓ CORRECT — WAVE RUSHED!</span><br><p>+${bonus} Gold (2× early call) · heroes healed.</p><p>${this.currentRushQuestion.exp}</p>`;
@@ -2725,7 +2761,7 @@ class Game {
             // Heal + call the wave (startNextWave already heals heroes/summons).
             this.startNextWave(false);
         } else {
-            feedback.innerHTML = `<span style="color:#ff3333; font-weight:bold;">✗ INCORRECT.</span><br><p>Correct answer: <strong>${this.currentRushQuestion.o[this.currentRushQuestion.a]}</strong></p><p>${this.currentRushQuestion.exp}</p><p style="color:#bdc3c7;">No penalty — the countdown resumes.</p>`;
+            feedback.innerHTML = `<span style="color:#ff3333; font-weight:bold;">✗ INCORRECT.</span><br><p>Correct answer: <strong>${this.currentRushQuestion.o[this.currentRushQuestion.a]}</strong></p><p>${this.currentRushQuestion.exp}</p><p style="color:#bdc3c7;">No reward this break. The countdown resumes.</p>`;
         }
         this.updateSidebarUI();
     }
@@ -2873,7 +2909,9 @@ class Game {
             });
             this.researchPoints += Math.round(8 * this.rpMult);
         } else {
-            this.enemies.forEach(enemy => enemy.applySlow(0.65, 3));
+            // Breaks open on an empty map, so the slow also lands on future
+            // spawns (see spawnEnemy); this covers anything still on the field.
+            this.enemies.filter(enemy => enemy.bestiaryKey === session.mission.enemyType).forEach(enemy => enemy.applySlow(0.65, 3));
             this.researchPoints += Math.round(8 * this.rpMult);
         }
         this.updateSidebarUI();

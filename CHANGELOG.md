@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-24 — Sprint 1: honest quiz economy (from `docs/game-audit-2026-10-24.md`)
+
+- **Answer options shuffled per draw** (`js/questions.js` `withShuffledOptions`). The banks put the
+  correct answer in slot B 57% / C 36% of the time; a 1,000-draw browser check now gives ~25% per slot.
+- **One quiz per break.** Bubble, Research Question and Solve to Rush share a single chance per
+  setup/between-wave break (`js/game.js` `claimBreakQuiz`, `breakQuizReady`). It is spent when the
+  question opens (no reroll by closing), expires when a wave starts, and re-arms when a wave is cleared.
+  The Research Question button disables and Solve to Rush hides once it's used.
+- **Wrong answers pay nothing** (was +20 gold / +2 RP); the explanation still shows.
+- **Wave 1 auto-starts** after a 30 s setup countdown (`FIRST_WAVE_COUNTDOWN_FRAMES`); the button reads
+  "Start First Wave (Ns)". Calling wave 1 early pays no gold (`earlyCallBonus`) so levels don't open with free gold.
+- **Atlas Evidence Break II reward now lands.** The break opens on an empty map, so the old "slow current
+  enemies" did nothing; phlogiston embers spawned afterwards now arrive slowed (`spawnEnemy`). Advantage text updated in `js/learning.js`.
+- Verified: 5 new regression checks (fail on the old code, pass now), all six test files pass
+  (bug-regression 77/77), plus a local browser run of the setup countdown, quiz gating, auto-start and re-arm.
+
 ## 2026-07-13 — Atlas of Evidence vertical slice
 
 - Added a Level 3 phlogiston mission that moves through prediction, two battlefield evidence breaks,

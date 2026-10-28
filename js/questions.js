@@ -135,8 +135,15 @@ class QuestionManager {
         if (!this.queue || this.queue.length === 0) {
             this.queue = this.shuffledCopy(this.activePool);
         }
-        if (this.queue.length === 0) return { ...FALLBACK_QUESTIONS[0] };
-        return this.queue.pop();
+        if (this.queue.length === 0) return this.withShuffledOptions(FALLBACK_QUESTIONS[0]);
+        return this.withShuffledOptions(this.queue.pop());
+    }
+
+    // The banks were authored with the answer mostly in slot B/C, so present
+    // options in a fresh order on every draw and remap the answer index.
+    withShuffledOptions(q) {
+        const order = this.shuffledCopy(q.o.map((_, i) => i));
+        return { ...q, o: order.map(i => q.o[i]), a: order.indexOf(q.a) };
     }
 
     // Used to gate tower specialization. We just draw from the active revision

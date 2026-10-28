@@ -57,7 +57,7 @@ const ATLAS_MISSIONS = {
                     "Phlogiston theory predicted a substance leaving during burning, not oxygen joining the metal.",
                     "A measurement fault needs independent evidence; repeated cooled samples show the same gain."
                 ],
-                advantage: "The oxygen model is confirmed; current misconception enemies are briefly slowed for analysis."
+                advantage: "The oxygen model is confirmed; phlogiston embers now arrive slowed for analysis."
             }
         ],
         debrief: {
