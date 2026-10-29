@@ -2249,6 +2249,19 @@ select {
     text-transform: uppercase;
 }
 
+.menu-hub-link {
+    margin-top: 2px;
+    color: #93aaa0;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.menu-hub-link:hover,
+.menu-hub-link:focus-visible { color: #d7e8df; text-decoration: underline; }
+
 /* Campaign atlas: clearer filters and cards with a parchment information band. */
 #screen-levelselect {
     background-image:
